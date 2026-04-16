@@ -1,5 +1,5 @@
 // ================================================================
-// Main Application (v4 — Total Score Engine)
+// Main Application (v4 — Total Score Engine + Responsive)
 // ================================================================
 const { createApp } = Vue;
 
@@ -107,6 +107,14 @@ createApp({
   methods: {
     ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods,
 
+    // ★ v5: Switch tab with settings reset
+    switchToTab(key) {
+      if (key === 'settings') {
+        this.settingsNav = [];
+      }
+      this.currentView = key;
+    },
+
     getClassObj(yearId, classId) { const y=this.academicYears.find(y=>y.id===yearId); if(!y)return null; return y.classes.find(c=>c.id===classId)||null; },
     getTabDef(key) { return this.allTabs.find(t => t.key === key) || { label:key, icon:'' }; },
     dateToStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
@@ -116,7 +124,12 @@ createApp({
     assessmentLabel(type) { return {assignment:'課業',quiz:'小測',unified_test:'統測',exam:'考試',class_performance:'課堂表現'}[type]||type; },
 
     toggleYear(yearId) { this.expandedYears={...this.expandedYears,[yearId]:!this.expandedYears[yearId]}; },
-    selectFromTree(yearId,classId) { this.currentAcademicYearId=yearId;this.currentClassId=classId; },
+    selectFromTree(yearId,classId) {
+      this.currentAcademicYearId=yearId;
+      this.currentClassId=classId;
+      // ★ v5: Close sidebar on mobile/tablet after selection
+      if (window.innerWidth < 1024) this.leftPanelOpen = false;
+    },
     sortStudents(key) { if(this.studentSortKey===key)this.studentSortAsc=!this.studentSortAsc;else{this.studentSortKey=key;this.studentSortAsc=true;} },
     yearStudentCount(y) { return y.classes.reduce((s,c)=>s+c.students.length,0); },
     settingsEnter(item) { this.settingsNav=[...this.settingsNav,item]; },
@@ -171,14 +184,28 @@ createApp({
   },
 
   async mounted() {
-    if(window.innerWidth<768) this.leftPanelOpen=false;
+    // ★ v5: Use lg breakpoint (1024px) to match CSS responsive behavior
+    if(window.innerWidth<1024) this.leftPanelOpen=false;
     this._injectCustomStyles();
     await this.loadAllData();
     this.initScoringWeights();
     document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&this.showModal)this.closeModal();});
-    document.addEventListener('click',()=>{this.gradesCPMenuOpen=false;this.gradesHeaderMenu=null;this.scoringCopyMenuOpen=false;});
+    // ★ v5: Also close gradesDetailPanel on outside click
+    document.addEventListener('click',()=>{
+      this.gradesCPMenuOpen=false;
+      this.gradesHeaderMenu=null;
+      this.gradesDetailPanel=null;
+      this.scoringCopyMenuOpen=false;
+      this.scoringTooltip=null;
+    });
     this.$watch(()=>this.modalData.studentName,(nv)=>{
       if(this.modalType==='addStudent'&&nv&&nv.trim().length>0){const m=this.globalStudents.find(g=>g.name===nv.trim());this.modalData.matchedGlobal=m||null;if(!m)this.modalData.linkToGlobal=false;}
+    });
+    // ★ v5: Handle window resize for responsive sidebar
+    window.addEventListener('resize',()=>{
+      if(window.innerWidth>=1024&&this.currentView!=='home'){
+        this.leftPanelOpen=true;
+      }
     });
   }
 }).mount('#app');

@@ -1,5 +1,5 @@
 // ================================================================
-// Grades Module - Methods & Computed (v4 — scoreCategory badges)
+// Grades Module - Methods & Computed (v4 — scoreCategory badges + v5 responsive)
 // ================================================================
 
 const GradesMethods = {
@@ -230,13 +230,14 @@ const GradesMethods = {
     else { const n = parseFloat(val); this.gradesFailPercent = isNaN(n) ? null : n; }
   },
 
+  // ★ v5: Responsive detail panel width
   gradesShowAssessmentDetail(idx, event) {
     if (!event) return;
     event.stopPropagation();
     const a = this.gradesOrderedAssessments[idx];
     if (!a) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const pW = 320, pH = 320;
+    const pW = Math.min(320, window.innerWidth - 16), pH = 320;
     let x, y;
     if (window.innerWidth < 640) { x = Math.max(8, (window.innerWidth - pW) / 2); y = Math.min(rect.bottom + 8, window.innerHeight - pH - 16); }
     else { x = rect.left + rect.width / 2 - pW / 2; y = rect.bottom + 8; }
@@ -494,7 +495,8 @@ const GradesComputed = {
     return result;
   },
   gradesDetailAssessment() { if (!this.gradesDetailPanel) return null; return this.gradesOrderedAssessments.find(a => a.id === this.gradesDetailPanel.assessmentId) || null; },
-  gradesDetailPanelStyle() { if (!this.gradesDetailPanel) return {}; return { position:'fixed', top:this.gradesDetailPanel.y+'px', left:this.gradesDetailPanel.x+'px', zIndex:9999, width:'320px' }; },
+  // ★ v5: Responsive detail panel width
+  gradesDetailPanelStyle() { if (!this.gradesDetailPanel) return {}; const w=Math.min(320,window.innerWidth-16); return { position:'fixed', top:this.gradesDetailPanel.y+'px', left:this.gradesDetailPanel.x+'px', zIndex:9999, width:w+'px' }; },
   gradesAutoFailPercent() { if (!this.currentClass) return 50; const name=(this.currentClass.className||''); if (/中[四五六]|[SF]\.?\s*[4-6]/i.test(name)||/^[4-6]\s*[A-Za-z]/i.test(name)) return 40; return 50; },
   gradesEffectiveFailPercent() { if (this.gradesFailPercent !== null && this.gradesFailPercent !== '' && !isNaN(parseFloat(this.gradesFailPercent))) return parseFloat(this.gradesFailPercent); return this.gradesAutoFailPercent; }
 };
