@@ -1,5 +1,5 @@
 // ================================================================
-// Static Data Definitions (v4 — new scoreConfig structure)
+// Static Data Definitions (v5 — custom categories + new features)
 // ================================================================
 const COLOR_THEMES = [
   { name:'經典藍', key:'blue', group:'standard', gradient:['#1e3a5f','#1e40af'], accent:'#2563eb', accentBg:'#eff6ff', text:'#1d4ed8' },
@@ -53,13 +53,23 @@ const QUICK_NAV_ITEMS = [
   { key:'parentComm', label:'家長通訊', icon:'fas fa-comments', desc:'家長溝通記錄', gradient:['#475569','#64748b'] },
 ];
 
-// ★ v4: Updated score config structure
+// ★ v5: Updated score config structure to include custom categories weight maps
 const DEFAULT_SCORE_CONFIG = {
-  ut: { assignment: 20, quiz: 20, unifiedTest: 40, classPerformance: 20 },
+  ut: { assignment: 20, quiz: 20, unifiedTest: 40, classPerformance: 20, customCategories: {} },
   exam: {
     a1Ratio: 30,
     a2Ratio: 70,
-    a1Weights: { assignment: 6, quiz: 6, unifiedTest: 12, classPerformance: 6 }
+    a1Weights: { assignment: 6, quiz: 6, unifiedTest: 12, classPerformance: 6, customCategories: {} }
   },
   yearly: { t1Weight: 40, t2Weight: 60 }
 };
+
+// ★ v5: Palette for custom categories
+const CUSTOM_CAT_COLORS = [
+  { key:'teal', bg:'#CCFBF1', text:'#0F766E', border:'#5EEAD4', headerBg:'#F0FDFA', tagBg:'#99F6E4', tagText:'#115E59' },
+  { key:'pink', bg:'#FCE7F3', text:'#BE185D', border:'#F9A8D4', headerBg:'#FDF2F8', tagBg:'#FBCFE8', tagText:'#9D174D' },
+  { key:'amber', bg:'#FEF3C7', text:'#92400E', border:'#FCD34D', headerBg:'#FFFBEB', tagBg:'#FDE68A', tagText:'#78350F' },
+  { key:'cyan', bg:'#CFFAFE', text:'#0E7490', border:'#67E8F9', headerBg:'#ECFEFF', tagBg:'#A5F3FC', tagText:'#155E75' },
+  { key:'lime', bg:'#ECFCCB', text:'#3F6212', border:'#BEF264', headerBg:'#F7FEE7', tagBg:'#D9F99D', tagText:'#365314' },
+  { key:'indigo', bg:'#E0E7FF', text:'#3730A3', border:'#A5B4FC', headerBg:'#EEF2FF', tagBg:'#C7D2FE', tagText:'#312E81' },
+];

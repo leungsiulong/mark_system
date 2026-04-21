@@ -1,5 +1,5 @@
 // ================================================================
-// Scoring Module (v4 — Total Score Calculation Engine)
+// Scoring Module (v6 — pass threshold based on class type, custom categories)
 // ================================================================
 const ScoringMethods = {
   scoringSetSubTab(tab) { this.scoringSubTab = tab; },
@@ -10,22 +10,26 @@ const ScoringMethods = {
     const cls = this.currentClass;
     if (!cls) { this.$nextTick(() => { this._scoringSkipWatch = false; }); return; }
     const sc = cls.scoreConfig || {};
+    const ccIds = (cls.customCategories || []).map(c => c.id);
+    const utCC = {}, examCC = {};
+    for (const id of ccIds) {
+      utCC[id] = sc.ut?.customCategories?.[id] ?? 0;
+      examCC[id] = sc.exam?.a1Weights?.customCategories?.[id] ?? 0;
+    }
     this.scoringWeightsLocal = {
-      ut: { assignment: sc.ut?.assignment ?? 20, quiz: sc.ut?.quiz ?? 20, unifiedTest: sc.ut?.unifiedTest ?? 40, classPerformance: sc.ut?.classPerformance ?? 20 },
+      ut: { assignment: sc.ut?.assignment ?? 20, quiz: sc.ut?.quiz ?? 20, unifiedTest: sc.ut?.unifiedTest ?? 40, classPerformance: sc.ut?.classPerformance ?? 20, customCategories: utCC },
       exam: {
-        a1Ratio: sc.exam?.a1Ratio ?? (sc.exam?.normalRatio ?? 30),
-        a2Ratio: sc.exam?.a2Ratio ?? (sc.exam?.examRatio ?? 70),
+        a1Ratio: sc.exam?.a1Ratio ?? 30,
+        a2Ratio: sc.exam?.a2Ratio ?? 70,
         a1Weights: {
           assignment: sc.exam?.a1Weights?.assignment ?? 6,
           quiz: sc.exam?.a1Weights?.quiz ?? 6,
           unifiedTest: sc.exam?.a1Weights?.unifiedTest ?? 12,
-          classPerformance: sc.exam?.a1Weights?.classPerformance ?? 6
+          classPerformance: sc.exam?.a1Weights?.classPerformance ?? 6,
+          customCategories: examCC
         }
       },
-      yearly: {
-        t1Weight: sc.yearly?.t1Weight ?? 40,
-        t2Weight: sc.yearly?.t2Weight ?? 60
-      }
+      yearly: { t1Weight: sc.yearly?.t1Weight ?? 40, t2Weight: sc.yearly?.t2Weight ?? 60 }
     };
     this.$nextTick(() => { this._scoringSkipWatch = false; });
   },
@@ -35,7 +39,11 @@ const ScoringMethods = {
     this._scoringSaveTimer = setTimeout(async () => {
       if (!this.scoringConfigValid || !this.currentAcademicYearId || !this.currentClassId) return;
       const w = this.scoringWeightsLocal;
-      const config = { ut:{...w.ut}, exam:{a1Ratio:w.exam.a1Ratio, a2Ratio:w.exam.a2Ratio, a1Weights:{...w.exam.a1Weights}}, yearly:{t1Weight:w.yearly.t1Weight, t2Weight:w.yearly.t2Weight} };
+      const config = {
+        ut: { ...w.ut, customCategories: { ...w.ut.customCategories } },
+        exam: { a1Ratio: w.exam.a1Ratio, a2Ratio: w.exam.a2Ratio, a1Weights: { ...w.exam.a1Weights, customCategories: { ...w.exam.a1Weights.customCategories } } },
+        yearly: { t1Weight: w.yearly.t1Weight, t2Weight: w.yearly.t2Weight }
+      };
       try {
         await db.collection('academicYears').doc(this.currentAcademicYearId).collection('classes').doc(this.currentClassId).update({ scoreConfig: config });
         if (this.currentClass) this.currentClass.scoreConfig = config;
@@ -49,7 +57,11 @@ const ScoringMethods = {
     if (!this.currentAcademicYearId || !this.currentClassId) return;
     if (!this.scoringConfigValid) { this.addToast('請修正權重設定錯誤後再儲存', 'warning'); return; }
     const w = this.scoringWeightsLocal;
-    const config = { ut:{...w.ut}, exam:{a1Ratio:w.exam.a1Ratio, a2Ratio:w.exam.a2Ratio, a1Weights:{...w.exam.a1Weights}}, yearly:{t1Weight:w.yearly.t1Weight, t2Weight:w.yearly.t2Weight} };
+    const config = {
+      ut: { ...w.ut, customCategories: { ...w.ut.customCategories } },
+      exam: { a1Ratio: w.exam.a1Ratio, a2Ratio: w.exam.a2Ratio, a1Weights: { ...w.exam.a1Weights, customCategories: { ...w.exam.a1Weights.customCategories } } },
+      yearly: { t1Weight: w.yearly.t1Weight, t2Weight: w.yearly.t2Weight }
+    };
     try {
       await db.collection('academicYears').doc(this.currentAcademicYearId).collection('classes').doc(this.currentClassId).update({ scoreConfig: config });
       if (this.currentClass) this.currentClass.scoreConfig = config;
@@ -62,7 +74,6 @@ const ScoringMethods = {
     const old = assessment.scoreCategory || 'none';
     if (old === category) return;
     assessment.scoreCategory = category;
-    // Find term id for this assessment
     let termId = this.gradesTermId;
     if (!termId && this.currentClass) {
       for (const t of this.currentClass.terms || []) {
@@ -80,23 +91,43 @@ const ScoringMethods = {
     return 'translateX(' + (idx * 100) + '%)';
   },
 
-  // === Calculation Helpers ===
+  _getEffScore(a, sid) {
+    const v = (a.scores || {})[sid];
+    if (v == null) return null;
+    if (typeof v === 'object' && v !== null) {
+      return Math.min((v.base || 0) + (v.bonus || 0), a.fullMark);
+    }
+    const n = parseFloat(v);
+    if (isNaN(n)) return null;
+    return Math.min(n, a.fullMark);
+  },
+
   _calcAvgPct(assessments, sid) {
     let sS = 0, fS = 0;
-    for (const a of assessments) { const s = (a.scores||{})[sid]; if (s != null && s !== '') { const n = parseFloat(s); if (!isNaN(n)) { sS += n; fS += a.fullMark; } } }
+    for (const a of assessments) {
+      const eff = this._getEffScore(a, sid);
+      if (eff !== null) { sS += eff; fS += a.fullMark; }
+    }
     return fS > 0 ? (sS / fS * 100) : null;
   },
   _calcSinglePct(a, sid) {
-    if (!a) return null; const s = (a.scores||{})[sid]; if (s == null || s === '') return null;
-    const n = parseFloat(s); return isNaN(n) ? null : (n / a.fullMark * 100);
+    if (!a) return null;
+    const eff = this._getEffScore(a, sid);
+    if (eff === null) return null;
+    return (eff / a.fullMark * 100);
+  },
+
+  _calcCustomCatAvg(term, sid, catId, scoreCategoryFilter) {
+    const list = (term.assessments || []).filter(a => a.type === 'custom' && a.customCategoryId === catId && (a.scoreCategory || 'none') === scoreCategoryFilter);
+    return this._calcAvgPct(list, sid);
   },
 
   scoringCalcA3(sid, term) {
     if (!term) return { a3: null, d: null };
     const w = this.scoringWeightsLocal.ut;
     const aa = term.assessments || [];
-    const utA = aa.filter(a => a.type === 'assignment' && (a.scoreCategory||'none') === 'ut');
-    const utQ = aa.filter(a => a.type === 'quiz' && (a.scoreCategory||'none') === 'ut');
+    const utA = aa.filter(a => a.type === 'assignment' && (a.scoreCategory || 'none') === 'ut');
+    const utQ = aa.filter(a => a.type === 'quiz' && (a.scoreCategory || 'none') === 'ut');
     const utI = aa.find(a => a.type === 'unified_test');
     const cpI = aa.find(a => a.type === 'class_performance' && a.period !== 'exam');
     const aP = this._calcAvgPct(utA, sid), qP = this._calcAvgPct(utQ, sid);
@@ -108,6 +139,14 @@ const ScoringMethods = {
     if (w.quiz > 0) add('小測均分', qP, w.quiz);
     if (w.unifiedTest > 0) add('統測分', uP, w.unifiedTest);
     if (w.classPerformance > 0) add('課堂表現', cP, w.classPerformance);
+    const ccs = (this.currentClass?.customCategories || []);
+    for (const cc of ccs) {
+      const wt = (w.customCategories && w.customCategories[cc.id]) || 0;
+      if (wt > 0) {
+        const p = this._calcCustomCatAvg(term, sid, cc.id, 'ut');
+        add(cc.name + '均分', p, wt);
+      }
+    }
     return { a3: Math.round(t), d: { aP, qP, uP, cP, comps, raw: t } };
   },
 
@@ -115,8 +154,8 @@ const ScoringMethods = {
     if (!term) return { a1: null, a2: null, total: null, d: null };
     const ec = this.scoringWeightsLocal.exam;
     const aa = term.assessments || [];
-    const exA = aa.filter(a => a.type === 'assignment' && (a.scoreCategory||'none') === 'exam');
-    const exQ = aa.filter(a => a.type === 'quiz' && (a.scoreCategory||'none') === 'exam');
+    const exA = aa.filter(a => a.type === 'assignment' && (a.scoreCategory || 'none') === 'exam');
+    const exQ = aa.filter(a => a.type === 'quiz' && (a.scoreCategory || 'none') === 'exam');
     const exI = aa.find(a => a.type === 'exam');
     const cpI = aa.find(a => a.type === 'class_performance' && a.period === 'exam');
     const aP = this._calcAvgPct(exA, sid), qP = this._calcAvgPct(exQ, sid);
@@ -133,6 +172,15 @@ const ScoringMethods = {
         { label:'A3 統測', value:a3, weight:w2.unifiedTest, contrib:a3*w2.unifiedTest/100 },
         { label:'課堂表現', value:cv, weight:w2.classPerformance, contrib:cv*w2.classPerformance/100 }
       ];
+      const ccs = (this.currentClass?.customCategories || []);
+      for (const cc of ccs) {
+        const wt = (w2.customCategories && w2.customCategories[cc.id]) || 0;
+        if (wt > 0) {
+          const p = this._calcCustomCatAvg(term, sid, cc.id, 'exam') || 0;
+          a1 += p * wt / 100;
+          a1C.push({ label: cc.name + '均分', value: p, weight: wt, contrib: p * wt / 100 });
+        }
+      }
     }
     let a2 = null;
     if (ec.a2Ratio > 0 && exI && eP !== null) a2 = eP * ec.a2Ratio / 100;
@@ -209,7 +257,14 @@ const ScoringMethods = {
     let csv = '\uFEFF學號,姓名';
     for (const a of ord) csv += ',' + a.name + '(' + a.fullMark + ')';
     csv += '\n';
-    for (const s of stu) { csv += s.studentNumber + ',' + s.studentName; for (const a of ord) { const sc = (a.scores||{})[s.id]; csv += ',' + (sc != null ? sc : ''); } csv += '\n'; }
+    for (const s of stu) {
+      csv += s.studentNumber + ',' + s.studentName;
+      for (const a of ord) {
+        const eff = this._getEffScore(a, s.id);
+        csv += ',' + (eff != null ? eff : '');
+      }
+      csv += '\n';
+    }
     const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url;
@@ -220,20 +275,45 @@ const ScoringMethods = {
 };
 
 const ScoringComputed = {
-  scoringUTWeightTotal() { const w=this.scoringWeightsLocal.ut; return (w.assignment||0)+(w.quiz||0)+(w.unifiedTest||0)+(w.classPerformance||0); },
+  scoringUTWeightTotal() {
+    const w = this.scoringWeightsLocal.ut;
+    let sum = (w.assignment||0)+(w.quiz||0)+(w.unifiedTest||0)+(w.classPerformance||0);
+    const cc = w.customCategories || {};
+    for (const k in cc) sum += (cc[k] || 0);
+    return sum;
+  },
   scoringA1A2WeightTotal() { return (this.scoringWeightsLocal.exam.a1Ratio||0)+(this.scoringWeightsLocal.exam.a2Ratio||0); },
-  scoringA1InternalTotal() { const w=this.scoringWeightsLocal.exam.a1Weights; return (w.assignment||0)+(w.quiz||0)+(w.unifiedTest||0)+(w.classPerformance||0); },
+  scoringA1InternalTotal() {
+    const w = this.scoringWeightsLocal.exam.a1Weights;
+    let sum = (w.assignment||0)+(w.quiz||0)+(w.unifiedTest||0)+(w.classPerformance||0);
+    const cc = w.customCategories || {};
+    for (const k in cc) sum += (cc[k] || 0);
+    return sum;
+  },
   scoringYearlyWeightTotal() { return (this.scoringWeightsLocal.yearly.t1Weight||0)+(this.scoringWeightsLocal.yearly.t2Weight||0); },
   scoringExamWeightTotal() { return this.scoringA1A2WeightTotal; },
   scoringConfigValid() {
     return this.scoringUTWeightTotal === 100 && this.scoringA1A2WeightTotal === 100 &&
       this.scoringA1InternalTotal === this.scoringWeightsLocal.exam.a1Ratio && this.scoringYearlyWeightTotal === 100;
   },
+  // ★ v6: Pass threshold - 40 for electives & senior classes, 50 otherwise
+  scoringPassThreshold() {
+    if (!this.currentClass) return 50;
+    if (this.currentClass.classType === 'elective') return 40;
+    const name = (this.currentClass.className||'');
+    if (/中[四五六]|[SF]\.?\s*[4-6]/i.test(name) || /^[4-6]\s*[A-Za-z]/i.test(name)) return 40;
+    return 50;
+  },
   scoringAssignmentsAndQuizzes() {
     if (!this.gradesTerm) return [];
-    return (this.gradesTerm.assessments || []).filter(a => a.type === 'assignment' || a.type === 'quiz')
-      .sort((a, b) => { const o = { assignment:0, quiz:1 }; if (o[a.type] !== o[b.type]) return o[a.type]-o[b.type]; return (a.order||0)-(b.order||0); });
+    return (this.gradesTerm.assessments || []).filter(a => a.type === 'assignment' || a.type === 'quiz' || a.type === 'custom')
+      .sort((a, b) => {
+        const o = { assignment: 0, quiz: 1, custom: 2 };
+        if (o[a.type] !== o[b.type]) return o[a.type] - o[b.type];
+        return (a.order || 0) - (b.order || 0);
+      });
   },
+  scoringCustomCategories() { return (this.currentClass?.customCategories || []); },
   scoringResultsData() {
     const term = this.gradesTerm; if (!term) return [];
     return this.gradesSortedStudents.map(s => {
@@ -294,10 +374,12 @@ const ScoringComputed = {
     data.sort((a,b)=>{ let va=a[k],vb=b[k]; if(va==null)va=asc?Infinity:-Infinity; if(vb==null)vb=asc?Infinity:-Infinity; if(k==='studentNumber'){va=parseInt(va)||0;vb=parseInt(vb)||0;} return asc?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); });
     return data;
   },
+  // ★ v6: Use dynamic pass threshold based on class
   scoringReportStats() {
     const data = this.scoringReportRankedData;
     const fields = ['t1a3','t1ExamTotal','t2a3','t2ExamTotal','yearlyTotal'];
     const stats = {};
+    const passT = this.scoringPassThreshold;
     for (const f of fields) {
       const vals = data.map(r=>r[f]).filter(v=>v!==null);
       if (!vals.length) { stats[f]={avg:'--',max:'--',min:'--',median:'--',stddev:'--',pass:0,good:0,excellent:0,total:data.length}; continue; }
@@ -306,7 +388,7 @@ const ScoringComputed = {
       const med=sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
       const variance=vals.reduce((acc,v)=>acc+(v-mean)**2,0)/vals.length;
       const isInt=f.includes('a3');
-      stats[f]={ avg:isInt?String(Math.round(mean)):mean.toFixed(1), max:isInt?String(Math.max(...vals)):Math.max(...vals).toFixed(1), min:isInt?String(Math.min(...vals)):Math.min(...vals).toFixed(1), median:isInt?String(Math.round(med)):med.toFixed(1), stddev:Math.sqrt(variance).toFixed(1), pass:vals.filter(v=>v>=50).length, good:vals.filter(v=>v>=70).length, excellent:vals.filter(v=>v>=80).length, total:data.length };
+      stats[f]={ avg:isInt?String(Math.round(mean)):mean.toFixed(1), max:isInt?String(Math.max(...vals)):Math.max(...vals).toFixed(1), min:isInt?String(Math.min(...vals)):Math.min(...vals).toFixed(1), median:isInt?String(Math.round(med)):med.toFixed(1), stddev:Math.sqrt(variance).toFixed(1), pass:vals.filter(v=>v>=passT).length, good:vals.filter(v=>v>=70).length, excellent:vals.filter(v=>v>=80).length, total:data.length };
     }
     return stats;
   }

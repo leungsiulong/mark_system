@@ -1,5 +1,5 @@
 // ================================================================
-// CRUD Operations (v4 — scoreCategory support)
+// CRUD Operations (v8 — split class/subject, in-memory migration)
 // ================================================================
 const CrudMethods = {
   async loadAllData() {
@@ -24,6 +24,29 @@ const CrudMethods = {
         const cs = await db.collection('academicYears').doc(yD.id).collection('classes').orderBy('createdAt').get();
         for (const cD of cs.docs) {
           const cls = { id: cD.id, ...cD.data(), students: [], terms: [] };
+          if (!cls.customCategories) cls.customCategories = [];
+
+          // ★ v8: Migrate classType on load (in-memory only)
+          // 'gradeRoster' → 'regular' (new meaning: base class without subject)
+          // Old 'regular' (with subject) → 'subject' (new: subject applied to a base class)
+          // Absent classType: infer from subject presence
+          if (!cls.classType) {
+            cls.classType = cls.subject ? 'subject' : 'regular';
+          } else if (cls.classType === 'gradeRoster') {
+            cls.classType = 'regular';
+          } else if (cls.classType === 'regular' && cls.subject) {
+            cls.classType = 'subject';
+          }
+          // Base regular should have empty subject
+          if (cls.classType === 'regular' && !cls.subject) cls.subject = '';
+
+          if (!cls.scoreConfig) cls.scoreConfig = JSON.parse(JSON.stringify(DEFAULT_SCORE_CONFIG));
+          if (!cls.scoreConfig.ut) cls.scoreConfig.ut = {};
+          if (!cls.scoreConfig.ut.customCategories) cls.scoreConfig.ut.customCategories = {};
+          if (!cls.scoreConfig.exam) cls.scoreConfig.exam = {};
+          if (!cls.scoreConfig.exam.a1Weights) cls.scoreConfig.exam.a1Weights = {};
+          if (!cls.scoreConfig.exam.a1Weights.customCategories) cls.scoreConfig.exam.a1Weights.customCategories = {};
+
           const ss = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('students').orderBy('studentNumber').get();
           cls.students = ss.docs.map(d => ({ id: d.id, ...d.data() }));
           const ts = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('terms').get();
@@ -32,10 +55,12 @@ const CrudMethods = {
             const as2 = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('terms').doc(tD.id).collection('assessments').orderBy('order').get();
             term.assessments = as2.docs.map(d => {
               const data = { id: d.id, ...d.data() };
-              // ★ v4: Migrate — ensure scoreCategory exists for assignments/quizzes
-              if ((data.type === 'assignment' || data.type === 'quiz') && !data.scoreCategory) {
-                data.scoreCategory = 'none';
-              }
+              if ((data.type === 'assignment' || data.type === 'quiz' || data.type === 'custom') && !data.scoreCategory) data.scoreCategory = 'none';
+              if (data.hasSubItems && !Array.isArray(data.subItems)) data.subItems = [];
+              if (data.hasSubItems && !data.subItemScores) data.subItemScores = {};
+              if (data.type === 'exam' && data.hasMultiplePapers && !Array.isArray(data.papers)) data.papers = [];
+              if (data.type === 'exam' && !data.paperScores) data.paperScores = {};
+              if (data.type === 'exam' && !data.adjustedScores) data.adjustedScores = {};
               return data;
             });
             cls.terms.push(term);
@@ -51,8 +76,20 @@ const CrudMethods = {
       this.loading = false;
     } catch (err) {
       console.error(err); this.error = err.message; this.loading = false;
-      this.addToast('載入數據失敗：' + err.message, 'error');
+      this.addToast('載入數據失敗:' + err.message, 'error');
     }
+  },
+
+  // ★ v8: Get all linked classes (share students)
+  // Base 'regular' + all 'subject' with same className are linked.
+  // Electives are standalone.
+  _getLinkedClasses(yearId, cls) {
+    const year = this.academicYears.find(y => y.id === yearId);
+    if (!year) return [cls];
+    const type = cls.classType || 'regular';
+    if (type === 'elective') return [cls];
+    return year.classes.filter(c => c.className === cls.className &&
+      (c.classType === 'regular' || c.classType === 'subject'));
   },
 
   async addAcademicYear() {
@@ -89,76 +126,463 @@ const CrudMethods = {
     this.addToast('學年已刪除', 'success');
   },
 
+  // ★ v8: addClass handles 'regular' (base class) and 'elective' (cross-class custom roster)
   async addClass() {
-    const { className, subject } = this.modalData;
-    if (!className.trim() || !subject.trim()) { this.addToast('請填寫班名和科目', 'warning'); return; }
+    const { className, classType, selectedStudentIds, subject } = this.modalData;
+    if (!className.trim()) { this.addToast('請填寫班名', 'warning'); return; }
+    const type = classType || 'regular';
+
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
     if (!yearId) { this.addToast('請先選擇學年', 'warning'); return; }
+    const year = this.academicYears.find(y => y.id === yearId);
+    if (!year) { this.addToast('找不到學年', 'error'); return; }
+
+    let subjectName = '';
+    if (type === 'elective') {
+      subjectName = (subject || '').trim();
+      if (subjectName === '__new__') subjectName = '';
+      if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
+    }
+
+    // Check for duplicate base 'regular' class
+    if (type === 'regular') {
+      const existing = year.classes.find(c => c.className === className.trim() && c.classType === 'regular');
+      if (existing) {
+        this.addToast('此學年已有一般班別「' + className.trim() + '」', 'warning');
+        return;
+      }
+    }
+
+    // Determine initial students
+    let initialStudents = [];
+    if (type === 'regular') {
+      // Auto-link with existing subject classes (same className)
+      const siblings = year.classes.filter(c =>
+        c.className === className.trim() && c.classType === 'subject');
+      if (siblings.length > 0) {
+        const seen = new Set();
+        // Use first sibling as source (all siblings share same students)
+        const sib = siblings[0];
+        for (const s of sib.students) {
+          const gid = s.globalStudentId || s.id;
+          if (seen.has(gid)) continue;
+          seen.add(gid);
+          initialStudents.push({
+            studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId
+          });
+        }
+      }
+    } else if (type === 'elective' && selectedStudentIds && selectedStudentIds.length > 0) {
+      const seen = new Set();
+      for (const c of year.classes) {
+        const ct = c.classType || 'regular';
+        if (ct !== 'regular' && ct !== 'subject') continue;
+        for (const s of c.students) {
+          const gid = s.globalStudentId || s.id;
+          if (selectedStudentIds.includes(s.id) && !seen.has(gid)) {
+            seen.add(gid);
+            initialStudents.push({
+              studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId
+            });
+          }
+        }
+      }
+    }
+
     const dc = JSON.parse(JSON.stringify(DEFAULT_SCORE_CONFIG));
-    const dr = await db.collection('academicYears').doc(yearId).collection('classes').add({ className: className.trim(), subject: subject.trim(), scoreConfig: dc, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const dr = await db.collection('academicYears').doc(yearId).collection('classes').add({
+      className: className.trim(), subject: subjectName, scoreConfig: dc,
+      classType: type,
+      customCategories: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
-    const t1 = await cr.collection('terms').add({ name: '上學期' });
-    const t2 = await cr.collection('terms').add({ name: '下學期' });
-    const nc = { id: dr.id, className: className.trim(), subject: subject.trim(), scoreConfig: dc, createdAt: new Date(), students: [], terms: [{ id: t1.id, name: '上學期', assessments: [] }, { id: t2.id, name: '下學期', assessments: [] }] };
-    const year = this.academicYears.find(y => y.id === yearId); if (year) year.classes.push(nc);
-    this.closeModal(); this.addToast('班別「' + className.trim() + '」已建立', 'success');
+
+    // Base 'regular' has no terms (no grade entry)
+    let terms = [];
+    if (type !== 'regular') {
+      const t1 = await cr.collection('terms').add({ name: '上學期' });
+      const t2 = await cr.collection('terms').add({ name: '下學期' });
+      terms = [{ id: t1.id, name: '上學期', assessments: [] }, { id: t2.id, name: '下學期', assessments: [] }];
+    }
+
+    const nc = {
+      id: dr.id, className: className.trim(), subject: subjectName,
+      classType: type, scoreConfig: dc, customCategories: [], createdAt: new Date(),
+      students: [],
+      terms: terms
+    };
+    year.classes.push(nc);
+
+    // Add initial students
+    for (const s of initialStudents) {
+      const sdr = await cr.collection('students').add({
+        studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      nc.students.push({
+        id: sdr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId
+      });
+      if (s.globalStudentId) {
+        try {
+          await db.collection('globalStudents').doc(s.globalStudentId).update({
+            records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
+          });
+          const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
+          if (gs) {
+            if (!gs.records) gs.records = [];
+            if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
+              gs.records.push({ academicYearId: yearId, classId: dr.id });
+            }
+          }
+        } catch (e) { /* silent */ }
+      }
+    }
+
+    this.closeModal();
+    let typeLabel = type === 'elective' ? '選修科' : '班別';
+    const displayName = className.trim() + (subjectName ? ' - ' + subjectName : '');
+    let msg = typeLabel + '「' + displayName + '」已建立';
+    if (initialStudents.length > 0) {
+      msg += ',已同步 ' + initialStudents.length + ' 位學生';
+    }
+    this.addToast(msg, 'success');
   },
 
-  async updateClass() {
-    const { id, className, subject } = this.modalData;
-    if (!className.trim() || !subject.trim()) { this.addToast('請填寫班名和科目', 'warning'); return; }
+  // ★ v8: addSubject - new method to add a subject to multiple base classes
+  async addSubject() {
+    let subjectName = (this.modalData.subject || '').trim();
+    if (subjectName === '__new__') subjectName = '';
+    if (!subjectName) { this.addToast('請選擇或輸入科目名稱', 'warning'); return; }
+
+    const selectedClassIds = this.modalData.selectedClassIds || [];
+    if (selectedClassIds.length === 0) { this.addToast('請至少選擇一個班別', 'warning'); return; }
+
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
-    await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({ className: className.trim(), subject: subject.trim() });
-    const y = this.academicYears.find(y => y.id === yearId); const c = y?.classes.find(c => c.id === id);
-    if (c) { c.className = className.trim(); c.subject = subject.trim(); }
-    this.settingsNav.forEach(n => { if (n.classId === id) n.label = className.trim() + ' - ' + subject.trim(); });
+    const year = this.academicYears.find(y => y.id === yearId);
+    if (!year) { this.addToast('找不到學年', 'error'); return; }
+
+    // Pre-check for duplicates
+    const conflicts = [];
+    for (const classId of selectedClassIds) {
+      const baseClass = year.classes.find(c => c.id === classId);
+      if (!baseClass) continue;
+      const existing = year.classes.find(c =>
+        c.classType === 'subject' && c.className === baseClass.className && c.subject === subjectName);
+      if (existing) conflicts.push(baseClass.className);
+    }
+    if (conflicts.length > 0) {
+      this.addToast('以下班別已有此科目:' + conflicts.join('、'), 'warning');
+      return;
+    }
+
+    // Create subject-class entity for each selected base class
+    let createdCount = 0;
+    let totalStudents = 0;
+    for (const classId of selectedClassIds) {
+      const baseClass = year.classes.find(c => c.id === classId);
+      if (!baseClass) continue;
+
+      const dc = JSON.parse(JSON.stringify(DEFAULT_SCORE_CONFIG));
+      const dr = await db.collection('academicYears').doc(yearId).collection('classes').add({
+        className: baseClass.className,
+        subject: subjectName,
+        scoreConfig: dc,
+        classType: 'subject',
+        customCategories: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
+
+      const t1 = await cr.collection('terms').add({ name: '上學期' });
+      const t2 = await cr.collection('terms').add({ name: '下學期' });
+
+      const nc = {
+        id: dr.id,
+        className: baseClass.className,
+        subject: subjectName,
+        classType: 'subject',
+        scoreConfig: dc,
+        customCategories: [],
+        createdAt: new Date(),
+        students: [],
+        terms: [
+          { id: t1.id, name: '上學期', assessments: [] },
+          { id: t2.id, name: '下學期', assessments: [] }
+        ]
+      };
+      year.classes.push(nc);
+
+      // Sync students from base class
+      for (const s of baseClass.students) {
+        const sdr = await cr.collection('students').add({
+          studentNumber: s.studentNumber,
+          studentName: s.studentName,
+          globalStudentId: s.globalStudentId || null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        nc.students.push({
+          id: sdr.id,
+          studentNumber: s.studentNumber,
+          studentName: s.studentName,
+          globalStudentId: s.globalStudentId || null
+        });
+        if (s.globalStudentId) {
+          try {
+            await db.collection('globalStudents').doc(s.globalStudentId).update({
+              records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
+            });
+            const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
+            if (gs) {
+              if (!gs.records) gs.records = [];
+              if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
+                gs.records.push({ academicYearId: yearId, classId: dr.id });
+              }
+            }
+          } catch (e) { /* silent */ }
+        }
+        totalStudents++;
+      }
+      createdCount++;
+    }
+
+    this.closeModal();
+    this.addToast('已新增科目「' + subjectName + '」至 ' + createdCount + ' 個班別(共同步 ' + totalStudents + ' 位學生)', 'success');
+  },
+
+  // ★ v8: updateClass - handles all three classTypes appropriately
+  async updateClass() {
+    const { id, className, subject, classType } = this.modalData;
+    const type = classType || 'regular';
+
+    if (!className.trim()) { this.addToast('請填寫班名', 'warning'); return; }
+
+    let subjectName = (subject || '').trim();
+    if (subjectName === '__new__') subjectName = '';
+
+    const yearId = this.modalData.yearId || this.currentAcademicYearId;
+    const year = this.academicYears.find(y => y.id === yearId);
+    const origCls = year?.classes.find(c => c.id === id);
+    if (!origCls) return;
+
+    if (type === 'regular') {
+      // Base class: allow className change (cascades to linked subject classes)
+      const newName = className.trim();
+      const oldName = origCls.className;
+      if (newName !== oldName) {
+        // Check conflict
+        if (year.classes.find(c => c.id !== id && c.className === newName && c.classType === 'regular')) {
+          this.addToast('此學年已有另一個一般班別「' + newName + '」', 'warning');
+          return;
+        }
+        // Update this class + all linked subject classes
+        const linked = year.classes.filter(c => c.className === oldName && (c.classType === 'regular' || c.classType === 'subject'));
+        for (const c of linked) {
+          await db.collection('academicYears').doc(yearId).collection('classes').doc(c.id).update({ className: newName });
+          c.className = newName;
+        }
+      } else {
+        // Just touch to persist classType if needed (silent migration)
+        await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({ classType: 'regular' });
+      }
+    } else if (type === 'subject') {
+      // Subject class: only allow subject change (className readonly)
+      if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
+      const conflict = year.classes.find(c =>
+        c.id !== id && c.classType === 'subject' && c.className === origCls.className && c.subject === subjectName);
+      if (conflict) {
+        this.addToast('此班別已有相同科目「' + subjectName + '」', 'warning');
+        return;
+      }
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({ subject: subjectName, classType: 'subject' });
+      origCls.subject = subjectName;
+    } else if (type === 'elective') {
+      // Elective: both className and subject editable
+      if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({
+        className: className.trim(),
+        subject: subjectName
+      });
+      origCls.className = className.trim();
+      origCls.subject = subjectName;
+    }
+
+    // Update settingsNav breadcrumb labels
+    this.settingsNav.forEach(n => {
+      if (n.classId === id) {
+        n.label = origCls.className + (origCls.subject ? ' - ' + origCls.subject : '');
+      }
+    });
     this.settingsNav = [...this.settingsNav];
-    this.closeModal(); this.addToast('班別已更新', 'success');
+
+    this.closeModal();
+    this.addToast('已更新', 'success');
   },
 
+  // ★ v8: deleteClass - cascades for base 'regular' (deletes linked subjects)
   async deleteClass(yearId, classId) {
-    const year = this.academicYears.find(y => y.id === yearId); const cls = year?.classes.find(c => c.id === classId); if (!cls) return;
-    for (const s of cls.students) await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('students').doc(s.id).delete();
-    for (const t of cls.terms || []) { for (const a of t.assessments || []) await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete(); await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(t.id).delete(); }
-    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).delete();
-    year.classes = year.classes.filter(c => c.id !== classId);
-    if (this.currentClassId === classId) this.currentClassId = null;
-    if (this.settingsCurrentClassId === classId) { const idx = this.settingsNav.findIndex(n => n.classId === classId); if (idx >= 0) this.settingsNav = this.settingsNav.slice(0, idx); }
-    this.addToast('班別已刪除', 'success');
+    const year = this.academicYears.find(y => y.id === yearId);
+    const cls = year?.classes.find(c => c.id === classId);
+    if (!cls) return;
+
+    const targets = [cls];
+    if (cls.classType === 'regular') {
+      // Cascade: delete all linked subject classes too
+      const linked = year.classes.filter(c =>
+        c.id !== cls.id && c.className === cls.className && c.classType === 'subject');
+      targets.push(...linked);
+    }
+
+    for (const t of targets) {
+      for (const s of t.students) {
+        await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(s.id).delete();
+      }
+      for (const term of t.terms || []) {
+        for (const a of term.assessments || []) {
+          await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).collection('assessments').doc(a.id).delete();
+        }
+        await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).delete();
+      }
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).delete();
+    }
+
+    // Update local state
+    const deletedIds = targets.map(t => t.id);
+    year.classes = year.classes.filter(c => !deletedIds.includes(c.id));
+
+    if (this.currentClassId && deletedIds.includes(this.currentClassId)) this.currentClassId = null;
+    if (this.settingsCurrentClassId && deletedIds.includes(this.settingsCurrentClassId)) {
+      const idx = this.settingsNav.findIndex(n => deletedIds.includes(n.classId));
+      if (idx >= 0) this.settingsNav = this.settingsNav.slice(0, idx);
+    }
+
+    const msg = targets.length > 1
+      ? '已刪除班別及其 ' + (targets.length - 1) + ' 個科目'
+      : '已刪除';
+    this.addToast(msg, 'success');
   },
 
+  // ★ v8: addStudent syncs to all linked classes (base regular + subjects)
   async addStudent() {
     const { studentNumber, studentName, linkToGlobal, matchedGlobal } = this.modalData;
     if (!studentNumber.trim() || !studentName.trim()) { this.addToast('請填寫學號和姓名', 'warning'); return; }
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
     const classId = this.modalData.classId || this.currentClassId;
     const cls = this.getClassObj(yearId, classId); if (!cls) { this.addToast('找不到班別', 'error'); return; }
-    if (cls.students.find(s => s.studentNumber === studentNumber.trim())) { this.addToast('此班已有相同學號的學生', 'warning'); return; }
+
+    const targets = this._getLinkedClasses(yearId, cls);
+
+    // Check duplicates in all targets
+    for (const t of targets) {
+      if (t.students.find(s => s.studentNumber === studentNumber.trim())) {
+        const typeLabel = t.classType === 'regular' ? '(一般班別)' : t.subject ? '(' + t.subject + ')' : '';
+        const msg = t.id === classId ? '此班已有相同學號的學生' : '連結班別「' + t.className + typeLabel + '」已有相同學號';
+        this.addToast(msg, 'warning');
+        return;
+      }
+    }
+
     let gid = null;
-    if (linkToGlobal && matchedGlobal) { gid = matchedGlobal.id; await db.collection('globalStudents').doc(matchedGlobal.id).update({ records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId }) }); }
-    else { const gr = await db.collection('globalStudents').add({ name: studentName.trim(), records: [{ academicYearId: yearId, classId }] }); gid = gr.id; this.globalStudents.push({ id: gr.id, name: studentName.trim(), records: [{ academicYearId: yearId, classId }] }); }
-    const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('students').add({ studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    cls.students.push({ id: dr.id, studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid });
-    this.closeModal(); this.addToast('學生「' + studentName.trim() + '」已新增', 'success');
+    const recordsToAdd = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
+    if (linkToGlobal && matchedGlobal) {
+      gid = matchedGlobal.id;
+      await db.collection('globalStudents').doc(matchedGlobal.id).update({
+        records: firebase.firestore.FieldValue.arrayUnion(...recordsToAdd)
+      });
+    } else {
+      const gr = await db.collection('globalStudents').add({ name: studentName.trim(), records: recordsToAdd });
+      gid = gr.id;
+      this.globalStudents.push({ id: gr.id, name: studentName.trim(), records: [...recordsToAdd] });
+    }
+
+    for (const t of targets) {
+      const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
+        studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      t.students.push({ id: dr.id, studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid });
+    }
+
+    this.closeModal();
+    const msg = targets.length > 1
+      ? '學生「' + studentName.trim() + '」已新增(同步至 ' + targets.length + ' 個連結班別)'
+      : '學生「' + studentName.trim() + '」已新增';
+    this.addToast(msg, 'success');
   },
 
+  // ★ v8: updateStudent syncs to all linked classes
   async updateStudent() {
     const { id, studentNumber, studentName } = this.modalData;
     if (!studentNumber.trim() || !studentName.trim()) { this.addToast('請填寫學號和姓名', 'warning'); return; }
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
     const classId = this.modalData.classId || this.currentClassId;
-    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('students').doc(id).update({ studentNumber: studentNumber.trim(), studentName: studentName.trim() });
-    const cls = this.getClassObj(yearId, classId); const s = cls?.students.find(s => s.id === id);
-    if (s) { s.studentNumber = studentNumber.trim(); s.studentName = studentName.trim(); }
-    this.closeModal(); this.addToast('學生資料已更新', 'success');
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return;
+    const origStu = cls.students.find(s => s.id === id);
+    if (!origStu) return;
+    const gid = origStu.globalStudentId;
+
+    const targets = this._getLinkedClasses(yearId, cls);
+
+    for (const t of targets) {
+      const conflict = t.students.find(s => s.studentNumber === studentNumber.trim() && (gid ? s.globalStudentId !== gid : s.id !== id));
+      if (conflict) {
+        const typeLabel = t.classType === 'regular' ? '(一般班別)' : t.subject ? '(' + t.subject + ')' : '';
+        this.addToast('班別「' + t.className + typeLabel + '」已有相同學號的其他學生', 'warning');
+        return;
+      }
+    }
+
+    for (const t of targets) {
+      let stuInTarget;
+      if (t.id === classId) stuInTarget = origStu;
+      else stuInTarget = gid ? t.students.find(s => s.globalStudentId === gid) : null;
+      if (!stuInTarget) continue;
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).update({
+        studentNumber: studentNumber.trim(), studentName: studentName.trim()
+      });
+      stuInTarget.studentNumber = studentNumber.trim();
+      stuInTarget.studentName = studentName.trim();
+    }
+
+    if (gid) {
+      try {
+        await db.collection('globalStudents').doc(gid).update({ name: studentName.trim() });
+        const gs = this.globalStudents.find(g => g.id === gid);
+        if (gs) gs.name = studentName.trim();
+      } catch (e) { /* silent */ }
+    }
+
+    this.closeModal();
+    const msg = targets.length > 1
+      ? '學生資料已更新(同步至 ' + targets.length + ' 個連結班別)'
+      : '學生資料已更新';
+    this.addToast(msg, 'success');
   },
 
+  // ★ v8: deleteStudent syncs to all linked classes
   async deleteStudent(yearId, classId, studentId) {
-    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('students').doc(studentId).delete();
-    const cls = this.getClassObj(yearId, classId); if (cls) cls.students = cls.students.filter(s => s.id !== studentId);
-    this.addToast('學生已刪除', 'success');
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return;
+    const stu = cls.students.find(s => s.id === studentId);
+    if (!stu) return;
+    const gid = stu.globalStudentId;
+    const targets = this._getLinkedClasses(yearId, cls);
+    let count = 0;
+    for (const t of targets) {
+      let stuInTarget;
+      if (t.id === classId) stuInTarget = stu;
+      else stuInTarget = gid ? t.students.find(s => s.globalStudentId === gid) : null;
+      if (!stuInTarget) continue;
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).delete();
+      t.students = t.students.filter(s => s.id !== stuInTarget.id);
+      count++;
+    }
+    const msg = count > 1 ? '學生已從 ' + count + ' 個連結班別中刪除' : '學生已刪除';
+    this.addToast(msg, 'success');
   },
 
+  // ★ v8: batchImportStudents syncs to all linked classes
   async batchImportStudents() {
     const text = this.modalData.text || '';
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
@@ -166,25 +590,49 @@ const CrudMethods = {
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
     const classId = this.modalData.classId || this.currentClassId;
     const cls = this.getClassObj(yearId, classId); if (!cls) { this.addToast('找不到班別', 'error'); return; }
+    const targets = this._getLinkedClasses(yearId, cls);
+
     const students = [];
     for (const line of lines) {
-      const parts = line.split(/[,，\t]/);
-      if (parts.length < 2) { this.modalData.parseError = '格式錯誤：「' + line + '」'; return; }
+      const parts = line.split(/[,,\t]/);
+      if (parts.length < 2) { this.modalData.parseError = '格式錯誤:「' + line + '」'; return; }
       const num = parts[0].trim(), name = parts[1].trim();
-      if (!num || !name) { this.modalData.parseError = '格式錯誤：「' + line + '」'; return; }
-      if (cls.students.find(s => s.studentNumber === num)) { this.modalData.parseError = '學號「' + num + '」已存在'; return; }
+      if (!num || !name) { this.modalData.parseError = '格式錯誤:「' + line + '」'; return; }
+      for (const t of targets) {
+        if (t.students.find(s => s.studentNumber === num)) {
+          const typeLabel = t.classType === 'regular' ? '(一般班別)' : t.subject ? '(' + t.subject + ')' : '';
+          this.modalData.parseError = '班別「' + t.className + typeLabel + '」已存在學號「' + num + '」';
+          return;
+        }
+      }
+      if (students.find(s => s.studentNumber === num)) {
+        this.modalData.parseError = '輸入資料中有重複學號「' + num + '」';
+        return;
+      }
       students.push({ studentNumber: num, studentName: name });
     }
+
+    const recordsForAll = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
     for (const s of students) {
-      const gr = await db.collection('globalStudents').add({ name: s.studentName, records: [{ academicYearId: yearId, classId }] });
-      const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('students').add({ studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      cls.students.push({ id: dr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id });
-      this.globalStudents.push({ id: gr.id, name: s.studentName, records: [{ academicYearId: yearId, classId }] });
+      const gr = await db.collection('globalStudents').add({ name: s.studentName, records: recordsForAll });
+      this.globalStudents.push({ id: gr.id, name: s.studentName, records: [...recordsForAll] });
+      for (const t of targets) {
+        const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
+          studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        t.students.push({ id: dr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id });
+      }
     }
-    this.closeModal(); this.addToast('已匯入 ' + students.length + ' 位學生', 'success');
+
+    this.closeModal();
+    const msg = targets.length > 1
+      ? '已匯入 ' + students.length + ' 位學生至 ' + targets.length + ' 個連結班別'
+      : '已匯入 ' + students.length + ' 位學生';
+    this.addToast(msg, 'success');
   },
 
-  openAddAssessmentModal(type, period) {
+  openAddAssessmentModal(type, period, customCategoryId) {
     if (!this.gradesTerm) return;
     const term = this.gradesTerm; const all = term.assessments || [];
     let name = '';
@@ -193,19 +641,71 @@ const CrudMethods = {
     else if (type === 'unified_test') name = '統測';
     else if (type === 'exam') name = '考試';
     else if (type === 'class_performance') name = period === 'exam' ? '考試期課堂表現' : '統測期課堂表現';
-    this.openModal('addAssessment', { type, period: period || null, name, fullMark: 100, date: '', notes: '', yearId: this.currentAcademicYearId, classId: this.currentClassId, termId: this.gradesTermId });
+    else if (type === 'custom' && customCategoryId) {
+      const cat = (this.currentClass.customCategories || []).find(c => c.id === customCategoryId);
+      const count = all.filter(a => a.type === 'custom' && a.customCategoryId === customCategoryId).length;
+      name = (cat ? cat.name : '自訂') + (count + 1);
+    }
+    this.openModal('addAssessment', {
+      type, period: period || null, customCategoryId: customCategoryId || null,
+      name, fullMark: 100, date: '', notes: '',
+      hasSubItems: false, subItems: [],
+      hasAdjustedPaper: false, adjustedMultiplier: 80, passingScore: 50,
+      hasMultiplePapers: false, papers: [],
+      yearId: this.currentAcademicYearId, classId: this.currentClassId, termId: this.gradesTermId
+    });
   },
 
   async addAssessmentConfirm() {
-    const { type, period, name, fullMark, date, notes, yearId, classId, termId } = this.modalData;
+    const { type, period, customCategoryId, name, fullMark, date, notes, yearId, classId, termId,
+      hasSubItems, subItems,
+      hasAdjustedPaper, adjustedMultiplier, passingScore,
+      hasMultiplePapers, papers } = this.modalData;
     if (!name.trim()) { this.addToast('請輸入名稱', 'warning'); return; }
     const fm = parseInt(fullMark); if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
+    let finalSubItems = [];
+    if (hasSubItems) {
+      if (!subItems || subItems.length === 0) { this.addToast('請至少新增一個小項目', 'warning'); return; }
+      for (const si of subItems) {
+        if (!si.name || !si.name.trim()) { this.addToast('小項目必須有名稱', 'warning'); return; }
+        const sfm = parseInt(si.fullMark);
+        if (isNaN(sfm) || sfm <= 0) { this.addToast('小項目滿分無效', 'warning'); return; }
+        finalSubItems.push({
+          id: (si.id && !String(si.id).startsWith('new_')) ? si.id : ('si_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
+          name: si.name.trim(), fullMark: sfm, order: finalSubItems.length
+        });
+      }
+    }
+    let finalPapers = [];
+    if (type === 'exam' && hasMultiplePapers) {
+      if (!papers || papers.length === 0) { this.addToast('請至少新增一個分卷', 'warning'); return; }
+      for (const p of papers) {
+        if (!p.name || !p.name.trim()) { this.addToast('分卷必須有名稱', 'warning'); return; }
+        const pfm = parseInt(p.fullMark);
+        const pw = parseFloat(p.weight);
+        if (isNaN(pfm) || pfm <= 0) { this.addToast('分卷滿分無效', 'warning'); return; }
+        if (isNaN(pw) || pw < 0) { this.addToast('分卷權重無效', 'warning'); return; }
+        finalPapers.push({
+          id: (p.id && !String(p.id).startsWith('new_')) ? p.id : ('pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
+          name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
+        });
+      }
+    }
     const cls = this.getClassObj(yearId, classId); const term = cls?.terms?.find(t => t.id === termId); if (!term) return;
     const order = Date.now();
-    const data = { type, name: name.trim(), fullMark: fm, date: date || null, notes: (notes || '').trim(), includeInUT: true, includeInExam: true, scores: {}, order, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
-    // ★ v4: Add scoreCategory for assignments/quizzes
-    if (type === 'assignment' || type === 'quiz') data.scoreCategory = 'none';
+    const data = {
+      type, name: name.trim(), fullMark: fm, date: date || null, notes: (notes || '').trim(),
+      includeInUT: true, includeInExam: true, scores: {}, order,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (type === 'assignment' || type === 'quiz' || type === 'custom') data.scoreCategory = 'none';
     if (type === 'class_performance') data.period = period;
+    if (type === 'custom') data.customCategoryId = customCategoryId;
+    if (hasSubItems && finalSubItems.length > 0) { data.hasSubItems = true; data.subItems = finalSubItems; data.subItemScores = {}; }
+    if (type === 'exam') {
+      if (hasAdjustedPaper) { data.hasAdjustedPaper = true; data.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80; data.passingScore = parseFloat(passingScore) || 50; data.adjustedScores = {}; }
+      if (hasMultiplePapers && finalPapers.length > 0) { data.hasMultiplePapers = true; data.papers = finalPapers; data.paperScores = {}; }
+    }
     const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').add(data);
     if (!term.assessments) term.assessments = [];
     term.assessments.push({ id: dr.id, ...data, createdAt: new Date() });
@@ -213,14 +713,178 @@ const CrudMethods = {
   },
 
   async updateAssessmentConfirm() {
-    const { assessmentId, name, fullMark, date, notes, yearId, classId, termId } = this.modalData;
+    const { assessmentId, name, fullMark, date, notes, yearId, classId, termId,
+      hasSubItems, subItems,
+      hasAdjustedPaper, adjustedMultiplier, passingScore,
+      hasMultiplePapers, papers } = this.modalData;
     if (!name.trim()) { this.addToast('請輸入名稱', 'warning'); return; }
-    const fm = parseInt(fullMark); if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
-    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').doc(assessmentId).update({ name: name.trim(), fullMark: fm, date: date || null, notes: (notes || '').trim() });
-    const cls = this.getClassObj(yearId, classId); const term = cls?.terms?.find(t => t.id === termId);
+    const fm = parseInt(fullMark);
+    if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
+
+    const cls = this.getClassObj(yearId, classId);
+    const term = cls?.terms?.find(t => t.id === termId);
     const a = term?.assessments?.find(a => a.id === assessmentId);
-    if (a) { a.name = name.trim(); a.fullMark = fm; a.date = date || null; a.notes = (notes || '').trim(); }
-    this.closeModal(); this.addToast('已更新「' + name.trim() + '」', 'success');
+    if (!a) return;
+
+    let finalSubItems = [];
+    if (hasSubItems) {
+      if (!subItems || subItems.length === 0) { this.addToast('請至少新增一個小項目', 'warning'); return; }
+      for (const si of subItems) {
+        if (!si.name || !si.name.trim()) { this.addToast('小項目必須有名稱', 'warning'); return; }
+        const sfm = parseInt(si.fullMark);
+        if (isNaN(sfm) || sfm <= 0) { this.addToast('小項目滿分無效', 'warning'); return; }
+        finalSubItems.push({
+          id: (si.id && !String(si.id).startsWith('new_')) ? si.id : ('si_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
+          name: si.name.trim(), fullMark: sfm, order: finalSubItems.length
+        });
+      }
+    }
+
+    let finalPapers = [];
+    if (a.type === 'exam' && hasMultiplePapers) {
+      if (!papers || papers.length === 0) { this.addToast('請至少新增一個分卷', 'warning'); return; }
+      for (const p of papers) {
+        if (!p.name || !p.name.trim()) { this.addToast('分卷必須有名稱', 'warning'); return; }
+        const pfm = parseInt(p.fullMark);
+        const pw = parseFloat(p.weight);
+        if (isNaN(pfm) || pfm <= 0) { this.addToast('分卷滿分無效', 'warning'); return; }
+        if (isNaN(pw) || pw < 0) { this.addToast('分卷權重無效', 'warning'); return; }
+        finalPapers.push({
+          id: (p.id && !String(p.id).startsWith('new_')) ? p.id : ('pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
+          name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
+        });
+      }
+    }
+
+    const wasSubItems = !!a.hasSubItems;
+    const wasAdjustedPaper = !!a.hasAdjustedPaper;
+    const wasMultiplePapers = !!a.hasMultiplePapers;
+
+    a.name = name.trim();
+    a.fullMark = fm;
+    a.date = date || null;
+    a.notes = (notes || '').trim();
+
+    if (hasSubItems) {
+      a.hasSubItems = true;
+      a.subItems = finalSubItems;
+      if (!a.subItemScores) a.subItemScores = {};
+      const validIds = new Set(finalSubItems.map(si => si.id));
+      for (const sid in a.subItemScores) {
+        for (const siId in a.subItemScores[sid]) {
+          if (!validIds.has(siId)) delete a.subItemScores[sid][siId];
+        }
+        if (Object.keys(a.subItemScores[sid]).length === 0) delete a.subItemScores[sid];
+      }
+      if (!wasSubItems) a.scores = {};
+    } else if (wasSubItems) {
+      a.hasSubItems = false;
+      delete a.subItems;
+      delete a.subItemScores;
+      a.scores = {};
+    }
+
+    if (a.type === 'exam') {
+      if (hasAdjustedPaper) {
+        a.hasAdjustedPaper = true;
+        a.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
+        a.passingScore = parseFloat(passingScore) || 50;
+        if (!wasAdjustedPaper && !hasMultiplePapers) {
+          a.adjustedScores = a.adjustedScores || {};
+        }
+      } else if (wasAdjustedPaper) {
+        a.hasAdjustedPaper = false;
+        delete a.adjustedMultiplier;
+        delete a.passingScore;
+        delete a.adjustedScores;
+        if (!hasMultiplePapers && !hasSubItems) a.scores = {};
+      }
+
+      if (hasMultiplePapers) {
+        a.hasMultiplePapers = true;
+        a.papers = finalPapers;
+        if (!a.paperScores) a.paperScores = {};
+        const validIds = new Set(finalPapers.map(p => p.id));
+        for (const sid in a.paperScores) {
+          for (const pId in a.paperScores[sid]) {
+            if (!validIds.has(pId)) delete a.paperScores[sid][pId];
+          }
+          if (Object.keys(a.paperScores[sid]).length === 0) delete a.paperScores[sid];
+        }
+        if (!wasMultiplePapers) a.scores = {};
+      } else if (wasMultiplePapers) {
+        a.hasMultiplePapers = false;
+        delete a.papers;
+        delete a.paperScores;
+        if (!hasSubItems) a.scores = {};
+      }
+    }
+
+    if (a.hasSubItems) {
+      for (const sid in (a.subItemScores || {})) {
+        this._gradesRecomputeSubItemTotal(a, sid);
+      }
+    }
+    if (a.type === 'exam') {
+      if (a.hasMultiplePapers) {
+        for (const sid in (a.paperScores || {})) {
+          this._gradesRecomputePaperTotal(a, sid);
+        }
+      } else if (a.hasAdjustedPaper) {
+        for (const sid in (a.adjustedScores || {})) {
+          this._gradesRecomputeExamAdjustedTotal(a, sid);
+        }
+      }
+    }
+
+    const updateData = {
+      name: name.trim(),
+      fullMark: fm,
+      date: date || null,
+      notes: (notes || '').trim(),
+      scores: a.scores || {}
+    };
+
+    if (a.hasSubItems) {
+      updateData.hasSubItems = true;
+      updateData.subItems = a.subItems;
+      updateData.subItemScores = a.subItemScores || {};
+    } else if (wasSubItems) {
+      updateData.hasSubItems = false;
+      updateData.subItems = firebase.firestore.FieldValue.delete();
+      updateData.subItemScores = firebase.firestore.FieldValue.delete();
+    }
+
+    if (a.type === 'exam') {
+      if (a.hasAdjustedPaper) {
+        updateData.hasAdjustedPaper = true;
+        updateData.adjustedMultiplier = a.adjustedMultiplier;
+        updateData.passingScore = a.passingScore;
+        if (!a.hasMultiplePapers) {
+          updateData.adjustedScores = a.adjustedScores || {};
+        }
+      } else if (wasAdjustedPaper) {
+        updateData.hasAdjustedPaper = false;
+        updateData.adjustedMultiplier = firebase.firestore.FieldValue.delete();
+        updateData.passingScore = firebase.firestore.FieldValue.delete();
+        updateData.adjustedScores = firebase.firestore.FieldValue.delete();
+      }
+
+      if (a.hasMultiplePapers) {
+        updateData.hasMultiplePapers = true;
+        updateData.papers = a.papers;
+        updateData.paperScores = a.paperScores || {};
+      } else if (wasMultiplePapers) {
+        updateData.hasMultiplePapers = false;
+        updateData.papers = firebase.firestore.FieldValue.delete();
+        updateData.paperScores = firebase.firestore.FieldValue.delete();
+      }
+    }
+
+    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').doc(assessmentId).update(updateData);
+
+    this.closeModal();
+    this.addToast('已更新「' + name.trim() + '」', 'success');
   },
 
   async deleteAssessmentDoc(yearId, classId, termId, assessmentId) {
@@ -230,6 +894,49 @@ const CrudMethods = {
     this.gradesFocusRow = -1; this.gradesFocusCol = -1; this.addToast('已刪除評估項目', 'success');
   },
 
+  async addCustomCategoryConfirm() {
+    const { name, yearId, classId } = this.modalData;
+    if (!name || !name.trim()) { this.addToast('請輸入類別名稱', 'warning'); return; }
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return;
+    if (!cls.customCategories) cls.customCategories = [];
+    const catId = 'cc_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+    const colorIdx = cls.customCategories.length % CUSTOM_CAT_COLORS.length;
+    const newCat = { id: catId, name: name.trim(), colorKey: CUSTOM_CAT_COLORS[colorIdx].key, order: cls.customCategories.length };
+    cls.customCategories.push(newCat);
+    if (!cls.scoreConfig) cls.scoreConfig = JSON.parse(JSON.stringify(DEFAULT_SCORE_CONFIG));
+    if (!cls.scoreConfig.ut.customCategories) cls.scoreConfig.ut.customCategories = {};
+    if (!cls.scoreConfig.exam.a1Weights.customCategories) cls.scoreConfig.exam.a1Weights.customCategories = {};
+    cls.scoreConfig.ut.customCategories[catId] = 0;
+    cls.scoreConfig.exam.a1Weights.customCategories[catId] = 0;
+    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).update({
+      customCategories: cls.customCategories,
+      scoreConfig: cls.scoreConfig
+    });
+    this.closeModal();
+    this.addToast('已新增類別「' + name.trim() + '」', 'success');
+  },
+
+  async deleteCustomCategory(yearId, classId, categoryId) {
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return;
+    cls.customCategories = (cls.customCategories || []).filter(c => c.id !== categoryId);
+    if (cls.scoreConfig?.ut?.customCategories) delete cls.scoreConfig.ut.customCategories[categoryId];
+    if (cls.scoreConfig?.exam?.a1Weights?.customCategories) delete cls.scoreConfig.exam.a1Weights.customCategories[categoryId];
+    for (const t of cls.terms || []) {
+      const toDelete = (t.assessments || []).filter(a => a.type === 'custom' && a.customCategoryId === categoryId);
+      for (const a of toDelete) {
+        await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete();
+      }
+      t.assessments = (t.assessments || []).filter(a => !(a.type === 'custom' && a.customCategoryId === categoryId));
+    }
+    await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).update({
+      customCategories: cls.customCategories,
+      scoreConfig: cls.scoreConfig
+    });
+    this.addToast('已刪除類別', 'success');
+  },
+
   async handleDelete() {
     const { target, id, yearId, classId } = this.modalData;
     switch (target) {
@@ -237,6 +944,7 @@ const CrudMethods = {
       case 'class': await this.deleteClass(yearId, id); break;
       case 'student': await this.deleteStudent(yearId, classId, id); break;
       case 'assessment': await this.deleteAssessmentDoc(yearId, classId, this.modalData.termId, id); break;
+      case 'customCategory': await this.deleteCustomCategory(yearId, classId, id); break;
     }
     this.closeModal();
   }
