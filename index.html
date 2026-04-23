@@ -64,7 +64,6 @@
     .toast-enter-from{transform:translateX(100px);opacity:0}
     .toast-leave-to{transform:translateX(100px);opacity:0}
 
-    /* ============ CALENDAR STYLES (v11) ============ */
     .cal-day{min-height:80px;cursor:pointer;transition:background .15s;position:relative}
     .cal-day:hover{background:#f0f9ff}
     .cal-event{cursor:pointer;transition:all .15s;user-select:none}
@@ -79,15 +78,13 @@
     .cal-popover{background:#fff;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.06);overflow:hidden;max-width:calc(100vw - 16px)}
     .cal-progress-bar{height:8px;background:#e5e7eb;border-radius:9999px;overflow:hidden}
     .cal-progress-fill{height:100%;background:linear-gradient(to right,#3b82f6,#60a5fa);transition:width .4s cubic-bezier(0.4,0,0.2,1)}
-/* ============ SEG TRACK ENHANCEMENTS (v11.1 — no ripple) ============ */
-.seg-track{display:inline-grid;grid-template-columns:1fr 1fr 1fr;background:#e2e8f0;border-radius:9999px;padding:2px;position:relative;min-width:150px;height:28px}
-.seg-thumb-wrap{position:absolute;top:2px;left:2px;bottom:2px;width:calc((100% - 4px)/3);pointer-events:none;transition:transform .25s cubic-bezier(0.4,0,0.2,1)}
-.seg-thumb-pill{width:100%;height:100%;background:#fff;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
-.seg-option{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;border-radius:9999px;color:#6b7280;transition:color .2s,transform .1s;user-select:none;border:none;background:none;padding:0 2px}
-.seg-option.seg-active{color:#1e40af;font-weight:600}
-.seg-option:not(:disabled):active{transform:scale(.94)}
-.seg-option:disabled{color:#cbd5e1;cursor:not-allowed}
-    /* ============ */
+    .seg-track{display:inline-grid;grid-template-columns:1fr 1fr 1fr;background:#e2e8f0;border-radius:9999px;padding:2px;position:relative;min-width:150px;height:28px}
+    .seg-thumb-wrap{position:absolute;top:2px;left:2px;bottom:2px;width:calc((100% - 4px)/3);pointer-events:none;transition:transform .25s cubic-bezier(0.4,0,0.2,1)}
+    .seg-thumb-pill{width:100%;height:100%;background:#fff;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
+    .seg-option{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;border-radius:9999px;color:#6b7280;transition:color .2s,transform .1s;user-select:none;border:none;background:none;padding:0 2px}
+    .seg-option.seg-active{color:#1e40af;font-weight:600}
+    .seg-option:not(:disabled):active{transform:scale(.94)}
+    .seg-option:disabled{color:#cbd5e1;cursor:not-allowed}
     .scoring-result-table th,.scoring-result-table td{white-space:nowrap;padding:6px 10px;font-size:13px;border-bottom:1px solid #e5e7eb}
     .scoring-result-table thead th{position:sticky;top:0;z-index:5;font-weight:600;font-size:11px}
     .scoring-result-table .sn-col{position:sticky;left:0;z-index:4;background:#fff;min-width:48px}
@@ -101,6 +98,12 @@
     .report-stat-clickable.active-pass{background-color:#dcfce7;box-shadow:inset 0 0 0 1px #86efac}
     .report-stat-clickable.active-good{background-color:#dbeafe;box-shadow:inset 0 0 0 1px #93c5fd}
     .report-stat-clickable.active-excellent{background-color:#f3e8ff;box-shadow:inset 0 0 0 1px #c4b5fd}
+    .custom-cat-row{display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6}
+    .custom-cat-row:last-child{border-bottom:none}
+    .custom-cat-row:hover{background-color:#f9fafb}
+    .custom-cat-select-btn{flex:1;text-align:left;padding:8px 12px;font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;border:none;background:transparent}
+    .custom-cat-delete-btn{padding:8px 10px;color:#9ca3af;border:none;border-left:1px solid #e5e7eb;background:transparent;cursor:pointer;transition:all .15s}
+    .custom-cat-delete-btn:hover{color:#ef4444;background-color:#fef2f2}
     @media (max-width: 640px) {
       .cal-day{min-height:56px;padding:2px!important}
       .cal-week-day{min-height:160px}
@@ -124,13 +127,21 @@
     .year-tab-btn.active{color:#1d4ed8;border-bottom-color:#3b82f6;background:#eff6ff}
     .view-toggle-btn{padding:4px 12px;font-size:12px;border-radius:6px;cursor:pointer;transition:all .15s;color:#6b7280;background:transparent;border:none}
     .view-toggle-btn.active{background:#fff;color:#1f2937;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+    .loading-progress{width:240px;height:4px;background:#e5e7eb;border-radius:9999px;overflow:hidden;margin-top:12px}
+    .loading-progress-fill{height:100%;background:linear-gradient(to right,#3b82f6,#60a5fa);transition:width .3s cubic-bezier(0.4,0,0.2,1)}
   </style>
 </head>
 <body>
 <div id="app" v-cloak>
 
   <div v-if="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
-    <div class="text-center"><i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i><div class="text-gray-600">正在載入數據...</div></div>
+    <div class="text-center">
+      <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+      <div class="text-gray-600">{{loadingText || '正在載入數據...'}}</div>
+      <div v-if="loadingProgress > 0" class="loading-progress mx-auto">
+        <div class="loading-progress-fill" :style="{width: loadingProgress + '%'}"></div>
+      </div>
+    </div>
   </div>
 
   <div class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="min-width:260px">
@@ -150,7 +161,6 @@
     <div class="flex justify-center"><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #1f2937"></div></div>
   </div>
 
-  <!-- ★ v11: Calendar Event Popover -->
   <template v-if="calendarEventPopover">
     <div class="fixed inset-0 z-40" @click="calClosePopover"></div>
     <transition name="popover-pop" appear>
@@ -226,7 +236,6 @@
     </transition>
   </template>
 
-  <!-- ★ v11: More Events Modal -->
   <div v-if="calendarMoreEventsModal" class="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" @click.self="calCloseMoreEventsModal">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
       <div class="flex items-center justify-between px-4 py-3 border-b">
@@ -514,7 +523,6 @@
           </div>
         </template>
 
-        <!-- ★ v11: Calendar Add Assessment Modal (Enhanced) -->
         <template v-if="modalType==='calAddAssessment'">
           <div class="bg-blue-50 rounded-lg px-3 py-2 text-sm text-blue-700 mb-1">
             <i class="fas fa-calendar-day mr-1"></i>從月曆新增項目
@@ -538,7 +546,6 @@
             </select>
           </div>
 
-          <!-- ★ Term segmented control -->
           <div v-if="calModalTerms.length > 0">
             <label class="block text-sm font-medium text-gray-700 mb-1">學期</label>
             <div class="seg-track" 
@@ -554,7 +561,6 @@
             </div>
           </div>
 
-          <!-- ★ Type segmented control -->
           <div v-if="modalData.yearId && modalData.classId && modalData.termId">
             <label class="block text-sm font-medium text-gray-700 mb-1">類型</label>
             <div class="seg-track"
@@ -606,7 +612,6 @@
             <textarea v-model="modalData.notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="選填（Shift+Enter 換行）"></textarea>
           </div>
 
-          <!-- Quiz bonus info -->
           <template v-if="modalData.type === 'quiz'">
             <div class="bg-pink-50 border border-pink-200 rounded-lg p-3">
               <div class="flex items-start gap-2">
@@ -619,7 +624,6 @@
             </div>
           </template>
 
-          <!-- Sub-items for non-unified_test, and non-exam-with-special -->
           <template v-if="modalData.type !== 'unified_test' && !(modalData.type === 'exam' && (modalData.hasAdjustedPaper || modalData.hasMultiplePapers))">
             <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
               <label class="flex items-start gap-2 cursor-pointer">
@@ -648,7 +652,6 @@
             </div>
           </template>
 
-          <!-- Exam special options -->
           <template v-if="modalData.type === 'exam'">
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
               <label class="flex items-start gap-2 cursor-pointer">
@@ -663,7 +666,7 @@
                   <input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                 </div>
                 <div><label class="text-xs text-gray-600">Set 2 封頂分</label>
-                  <input v-model.number="modalData.passingScore" type="number" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  <input v-model.number="modalData.passingScore" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                 </div>
               </div>
             </div>
@@ -705,7 +708,7 @@
 
         <template v-if="modalType==='addCustomCategory'">
           <div><label class="block text-sm font-medium text-gray-700 mb-1">類別名稱</label><input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：實習 / 專題 / 出席"></div>
-          <div class="text-xs text-gray-500">新增後，您可以在「總分計算 > 計分設定」中為此類別設定權重。</div>
+          <div class="text-xs text-gray-500">新增後，您可以在「總分計算」的計分權重中為此類別設定權重（自動儲存）。</div>
         </template>
 
         <template v-if="modalType==='deleteConfirm'">
@@ -761,7 +764,7 @@
 
       <main class="flex-1 overflow-y-auto bg-gray-50 min-w-0">
 
-        <!-- ==================== HOME TAB (Enhanced Calendar v11) ==================== -->
+        <!-- ==================== HOME TAB ==================== -->
         <div v-if="currentView==='home'" class="p-3 sm:p-4 lg:p-6">
           <div :style="bannerStyle" class="rounded-xl p-4 sm:p-6 text-white mb-4 sm:mb-6 shadow">
             <h2 class="text-xl sm:text-2xl font-bold mb-1">歡迎使用成績管理系統</h2>
@@ -784,16 +787,13 @@
             </div>
           </div>
 
-          <!-- ★ Enhanced Calendar -->
           <div class="bg-white rounded-xl shadow p-3 sm:p-4">
-            <!-- Toolbar -->
             <div class="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
               <div class="flex items-center gap-2 sm:gap-3">
                 <h3 class="text-base sm:text-lg font-bold text-gray-800">
                   <template v-if="calendarView === 'month'">{{calendarTitle}}</template>
                   <template v-else>{{calendarWeekTitle}}</template>
                 </h3>
-                <!-- View toggle -->
                 <div class="inline-flex bg-gray-100 rounded-lg p-0.5">
                   <button @click="calSetView('month')" class="view-toggle-btn" :class="{'active': calendarView === 'month'}">月</button>
                   <button @click="calSetView('week')" class="view-toggle-btn" :class="{'active': calendarView === 'week'}">週</button>
@@ -819,7 +819,6 @@
               </div>
             </div>
 
-            <!-- ★ Type filter -->
             <div class="flex items-center gap-2 sm:gap-3 mb-3 pb-2 border-b flex-wrap">
               <span class="text-xs text-gray-500 font-semibold">顯示：</span>
               <label class="flex items-center gap-1 cursor-pointer text-xs select-none">
@@ -844,7 +843,6 @@
               </label>
             </div>
 
-            <!-- MONTH VIEW -->
             <div v-if="calendarView === 'month'">
               <div class="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 mb-1">
                 <div v-for="d in dayNames" :key="d" class="py-1">{{d}}</div>
@@ -883,7 +881,6 @@
               </div>
             </div>
 
-            <!-- WEEK VIEW -->
             <div v-else>
               <div class="grid grid-cols-7 gap-1">
                 <div v-for="(d, di) in calendarWeekDays" :key="di"
@@ -922,7 +919,6 @@
               </div>
             </div>
 
-            <!-- Today's events quick view -->
             <div v-if="todayEvents.length > 0" class="mt-3 sm:mt-4 pt-3 border-t">
               <h4 class="text-sm font-semibold text-gray-700 mb-2">
                 <i class="fas fa-star text-yellow-400 mr-1"></i>今日項目
@@ -962,17 +958,27 @@
 
                 <div class="relative">
                   <button @click.stop="gradesCustomMenuOpen=!gradesCustomMenuOpen" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 transition"><i class="fas fa-plus mr-1"></i>自訂類別 <i class="fas fa-caret-down ml-0.5"></i></button>
-                  <div v-if="gradesCustomMenuOpen" class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-52" @click.stop>
-                    <div v-if="!currentClass.customCategories || currentClass.customCategories.length===0" class="px-3 py-2 text-xs text-gray-400 italic">尚無自訂類別</div>
-                    <button v-for="cat in (currentClass.customCategories||[])" :key="cat.id" @click="openAddAssessmentModal('custom',null,cat.id);gradesCustomMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2">
-                      <span class="inline-block w-3 h-3 rounded" :style="{backgroundColor:getCustomCategoryColor(cat.colorKey).tagBg}"></span>
-                      <span>{{cat.name}}</span>
-                    </button>
+                  <div v-if="gradesCustomMenuOpen" class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-64" @click.stop>
+                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b bg-gray-50">自訂類別管理</div>
+                    <div v-if="!currentClass.customCategories || currentClass.customCategories.length===0" class="px-3 py-3 text-xs text-gray-400 italic text-center">尚無自訂類別</div>
+                    <div v-else>
+                      <div v-for="cat in (currentClass.customCategories||[])" :key="cat.id" class="custom-cat-row">
+                        <button @click="openAddAssessmentModal('custom',null,cat.id);gradesCustomMenuOpen=false" class="custom-cat-select-btn" :title="'新增「'+cat.name+'」項目'">
+                          <span class="inline-block w-3 h-3 rounded shrink-0" :style="{backgroundColor:getCustomCategoryColor(cat.colorKey).tagBg}"></span>
+                          <span class="text-gray-700">{{cat.name}}</span>
+                        </button>
+                        <button @click.stop="confirmDeleteCustomCategory(cat);gradesCustomMenuOpen=false" class="custom-cat-delete-btn" :title="'刪除類別「'+cat.name+'」'">
+                          <i class="fas fa-trash text-xs"></i>
+                        </button>
+                      </div>
+                    </div>
                     <div class="border-t mt-1 pt-1">
                       <button @click="openAddCustomCategoryModal();gradesCustomMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs text-teal-600 hover:bg-teal-50"><i class="fas fa-plus mr-1"></i>新增類別...</button>
                     </div>
                   </div>
                 </div>
+
+                <button @click="exportCSV" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition" title="匯出此學期成績為 CSV 檔案"><i class="fas fa-file-csv mr-1"></i>匯出 CSV</button>
 
                 <span v-if="Object.keys(gradesSavingCells).length>0" class="text-xs text-gray-400 ml-1 sm:ml-2"><i class="fas fa-circle-notch fa-spin mr-1"></i>儲存中...</span>
                 <div class="flex-1"></div>
@@ -1069,33 +1075,51 @@
                 <button @click="scoringSubTab='results'" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition" :class="scoringSubTab==='results'?'bg-blue-500 text-white shadow-sm':'text-gray-600 hover:bg-gray-100'"><i class="fas fa-table mr-1"></i>計算結果</button>
                 <button @click="scoringSubTab='report'" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition" :class="scoringSubTab==='report'?'bg-blue-500 text-white shadow-sm':'text-gray-600 hover:bg-gray-100'"><i class="fas fa-file-alt mr-1"></i>總分報表</button>
                 <div class="flex-1"></div>
-                <span v-if="scoringSaveStatus==='saved'" class="text-xs text-green-500 transition"><i class="fas fa-check mr-1"></i>已儲存</span>
+                <span v-if="scoringSaveStatus==='saved'" class="text-xs text-green-500 transition"><i class="fas fa-check mr-1"></i>已自動儲存</span>
               </div>
             </div>
 
             <div v-if="scoringSubTab==='settings'" class="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
               <div class="max-w-3xl mx-auto space-y-4">
 
+                <!-- ★ 項目歸屬 Section (獨立置頂) -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
-                  <button @click="scoringToggleAccordion('custom')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
+                  <button @click="scoringToggleAccordion('attribution')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
-                      <div class="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0"><i class="fas fa-tags text-teal-500 text-sm"></i></div>
-                      <div class="text-left"><h3 class="font-bold text-gray-800 text-sm">自訂項目類別</h3><p class="text-xs text-gray-500 hidden sm:block">管理此班別的自訂項目類別（如實習、專題）</p></div>
-                    </div>
-                    <i class="fas fa-chevron-down text-gray-400 transition-transform text-sm" :class="{'rotate-180':scoringAccordion.custom}"></i>
-                  </button>
-                  <div v-if="scoringAccordion.custom" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
-                    <div class="mt-3 space-y-2">
-                      <div v-for="cat in scoringCustomCategories" :key="cat.id" class="flex items-center gap-3 p-2 rounded-lg border" :style="{backgroundColor:getCustomCategoryColor(cat.colorKey).headerBg,borderColor:getCustomCategoryColor(cat.colorKey).border}">
-                        <span class="inline-block w-4 h-4 rounded" :style="{backgroundColor:getCustomCategoryColor(cat.colorKey).tagBg}"></span>
-                        <span class="flex-1 font-medium text-sm" :style="{color:getCustomCategoryColor(cat.colorKey).text}">{{cat.name}}</span>
-                        <button @click="confirmDeleteCustomCategory(cat)" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-trash text-xs"></i></button>
+                      <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0"><i class="fas fa-tag text-amber-500 text-sm"></i></div>
+                      <div class="text-left">
+                        <h3 class="font-bold text-gray-800 text-sm">項目歸屬</h3>
+                        <p class="text-xs text-gray-500 hidden sm:block">設定各課業、小測及自訂項目計入統測總分或考試總分</p>
                       </div>
-                      <button @click="openAddCustomCategoryModal" class="w-full px-3 py-2 text-sm bg-white border-2 border-dashed border-teal-300 text-teal-600 rounded-lg hover:bg-teal-50"><i class="fas fa-plus mr-1"></i>新增自訂類別</button>
+                    </div>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform text-sm" :class="{'rotate-180':scoringAccordion.attribution}"></i>
+                  </button>
+                  <div v-if="scoringAccordion.attribution" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
+                    <div class="mt-3 space-y-2">
+                      <div v-for="a in scoringAssignmentsAndQuizzes" :key="'attr-'+a.id" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition" :class="{'opacity-40':(a.scoreCategory||'none')==='exam'}">
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
+                            <span class="text-xs px-1 sm:px-1.5 py-0.5 rounded font-medium" :class="a.type==='assignment'?'bg-blue-100 text-blue-700':(a.type==='quiz'?'bg-green-100 text-green-700':'bg-teal-100 text-teal-700')">{{a.type==='assignment'?'課業':a.type==='quiz'?'小測':'自訂'}}</span>
+                            <span class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{a.name}}</span>
+                            <span class="text-xs text-gray-400 hidden sm:inline">{{gradesFormatDate(a.date)}}</span>
+                          </div>
+                        </div>
+                        <div class="seg-track shrink-0">
+                          <div class="seg-thumb-wrap" :style="{transform:scoringSegTransform(a.scoreCategory||'none')}"><div class="seg-thumb-pill"></div></div>
+                          <button class="seg-option" :class="{'seg-active':(a.scoreCategory||'none')==='ut'}" @click="scoringSetCategory(a,'ut')">統測</button>
+                          <button class="seg-option" :class="{'seg-active':(a.scoreCategory||'none')==='exam'}" @click="scoringSetCategory(a,'exam')">考試</button>
+                          <button class="seg-option" :class="{'seg-active':!a.scoreCategory||a.scoreCategory==='none'}" @click="scoringSetCategory(a,'none')">不計入</button>
+                        </div>
+                      </div>
+                      <div v-if="scoringAssignmentsAndQuizzes.length===0" class="text-center text-gray-400 text-sm py-4">尚無課業、小測或自訂類別項目</div>
+                      <div v-if="scoringAssignmentsAndQuizzes.length>0" class="text-xs text-gray-400 italic pt-2">
+                        <i class="fas fa-info-circle mr-1"></i>切換類別後會立即自動儲存
+                      </div>
                     </div>
                   </div>
                 </div>
 
+                <!-- A. 統測計分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('ut')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1118,30 +1142,10 @@
                       </div>
                     </div>
                     <div class="mt-2 text-sm font-medium" :class="scoringUTWeightTotal===100?'text-green-600':'text-red-500'">合計：{{scoringUTWeightTotal}}% <span v-if="scoringUTWeightTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
-                    <div class="mt-4 pt-4 border-t">
-                      <h4 class="text-sm font-semibold text-gray-700 mb-3">功課/小測/自訂項目歸屬</h4>
-                      <div class="space-y-2">
-                        <div v-for="a in scoringAssignmentsAndQuizzes" :key="'ut-'+a.id" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition" :class="{'opacity-40':(a.scoreCategory||'none')==='exam'}">
-                          <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
-                              <span class="text-xs px-1 sm:px-1.5 py-0.5 rounded font-medium" :class="a.type==='assignment'?'bg-blue-100 text-blue-700':(a.type==='quiz'?'bg-green-100 text-green-700':'bg-teal-100 text-teal-700')">{{a.type==='assignment'?'課業':a.type==='quiz'?'小測':'自訂'}}</span>
-                              <span class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{a.name}}</span>
-                              <span class="text-xs text-gray-400 hidden sm:inline">{{gradesFormatDate(a.date)}}</span>
-                            </div>
-                          </div>
-                          <div class="seg-track shrink-0">
-                            <div class="seg-thumb-wrap" :style="{transform:scoringSegTransform(a.scoreCategory||'none')}"><div class="seg-thumb-pill"></div></div>
-                            <button class="seg-option" :class="{'seg-active':(a.scoreCategory||'none')==='ut'}" @click="scoringSetCategory(a,'ut')">統測</button>
-                            <button class="seg-option" :class="{'seg-active':(a.scoreCategory||'none')==='exam'}" @click="scoringSetCategory(a,'exam')">考試</button>
-                            <button class="seg-option" :class="{'seg-active':!a.scoreCategory||a.scoreCategory==='none'}" @click="scoringSetCategory(a,'none')">不計入</button>
-                          </div>
-                        </div>
-                        <div v-if="scoringAssignmentsAndQuizzes.length===0" class="text-center text-gray-400 text-sm py-4">尚無課業、小測或自訂類別項目</div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
+                <!-- B. 考試計分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('exam')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1174,6 +1178,7 @@
                   </div>
                 </div>
 
+                <!-- C. 全年總分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('yearly')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1191,10 +1196,12 @@
                   </div>
                 </div>
 
-                <div class="flex gap-2 sm:gap-3">
-                  <button @click="saveScoringConfig" class="px-3 sm:px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"><i class="fas fa-save mr-1"></i>手動儲存</button>
-                  <button @click="exportCSV" class="px-3 sm:px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition"><i class="fas fa-file-csv mr-1"></i>匯出 CSV</button>
+                <!-- ★ 自動儲存提示（取代原來的手動儲存按鈕） -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700 flex items-center gap-2">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                  <span>更改任何權重設定後會在 1.5 秒內自動儲存。切換「項目歸屬」會即時儲存。</span>
                 </div>
+
               </div>
             </div>
 
@@ -1333,486 +1340,470 @@
           </template>
         </div>
 
-<!-- ==================== ANALYSIS TAB (v12) ==================== -->
-<div v-if="currentView==='analysis'" class="h-full flex flex-col">
-  <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2 flex items-center gap-1 overflow-x-auto">
-    <button @click="analysisSetTab('class')"
-      class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
-      :class="analysisSubTab==='class' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
-      <i class="fas fa-users mr-1"></i>班級分析
-    </button>
-    <button @click="analysisSetTab('student')"
-      class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
-      :class="analysisSubTab==='student' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
-      <i class="fas fa-user mr-1"></i>學生分析
-    </button>
-    <button @click="analysisSetTab('crossYear')"
-      class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
-      :class="analysisSubTab==='crossYear' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
-      <i class="fas fa-layer-group mr-1"></i>跨學年分析
-    </button>
-  </div>
-
-  <!-- ========= CLASS ANALYSIS ========= -->
-  <div v-if="analysisSubTab==='class'" class="flex-1 overflow-y-auto p-3 sm:p-4">
-    <div v-if="!currentClass" class="flex items-center justify-center h-64 text-gray-400">
-      <div class="text-center">
-        <i class="fas fa-hand-point-left text-4xl mb-3"></i>
-        <p>請先從左側選擇學年和班別</p>
-      </div>
-    </div>
-    <template v-else>
-      <div class="flex flex-wrap gap-2 mb-4">
-        <button v-for="term in currentClass.terms" :key="term.id"
-          @click="gradesSelectTerm(term.id)"
-          class="px-3 py-1 text-sm rounded-lg border transition"
-          :class="gradesTermId===term.id ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
-          {{term.name}}
-        </button>
-      </div>
-
-      <!-- 1.1 Overview Table -->
-      <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-        <h3 class="text-base font-bold text-gray-800 mb-3">
-          <i class="fas fa-table text-blue-500 mr-1"></i>成績概覽
-        </h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs sm:text-sm" style="min-width:720px">
-            <thead class="bg-gray-50">
-              <tr>
-                <th @click="analysisSortOverview('name')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">項目 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th class="px-2 py-2 text-left whitespace-nowrap">類型</th>
-                <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
-                <th @click="analysisSortOverview('avg')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">平均 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('median')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">中位 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('max')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">最高 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('min')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">最低 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('stddev')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">標準差 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('passRate')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap text-green-700">合格率 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortOverview('excellentRate')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap text-purple-700">優秀率 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in analysisClassOverviewData.rows" :key="r.id" class="border-t hover:bg-gray-50">
-                <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
-                <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
-                <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
-                <td class="px-2 py-2 text-center">{{r.avg !== null ? r.avg.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.median !== null ? r.median.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.max !== null ? r.max.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.min !== null ? r.min.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.stddev !== null ? r.stddev.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center text-green-700">{{r.count > 0 ? r.passRate.toFixed(0) + '%' : '—'}}</td>
-                <td class="px-2 py-2 text-center text-purple-700">{{r.count > 0 ? r.excellentRate.toFixed(0) + '%' : '—'}}</td>
-              </tr>
-              <tr v-if="analysisClassOverviewData.semester" class="border-t-2 bg-amber-50 font-bold">
-                <td class="px-2 py-2 text-amber-800">{{analysisClassOverviewData.semester.name}}</td>
-                <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded bg-amber-600 text-white">總分</span></td>
-                <td class="px-2 py-2 text-center text-gray-500">100</td>
-                <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.avg.toFixed(1)}}</td>
-                <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.median.toFixed(1)}}</td>
-                <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.max.toFixed(1)}}</td>
-                <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.min.toFixed(1)}}</td>
-                <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.stddev.toFixed(1)}}</td>
-                <td class="px-2 py-2 text-center text-green-700">{{analysisClassOverviewData.semester.passRate.toFixed(0)}}%</td>
-                <td class="px-2 py-2 text-center text-purple-700">{{analysisClassOverviewData.semester.excellentRate.toFixed(0)}}%</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="analysisClassOverviewData.rows.length === 0" class="text-center text-gray-400 py-8">尚無評估項目</div>
-        </div>
-      </div>
-
-      <!-- 1.2 Distribution Histogram -->
-      <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h3 class="text-base font-bold text-gray-800">
-            <i class="fas fa-chart-bar text-orange-500 mr-1"></i>分數分佈直方圖
-          </h3>
-          <select :value="analysisDistributionKey || '__exam'" @change="analysisSetDistributionKey($event.target.value)"
-            class="text-xs sm:text-sm border border-gray-300 rounded-lg px-2 py-1">
-            <option v-for="opt in analysisDistributionOptions" :key="opt.key" :value="opt.key">{{opt.label}}</option>
-          </select>
-        </div>
-        <div v-if="analysisDistributionData && analysisDistributionData.total > 0" class="bg-gray-50 rounded-lg p-2 mb-3 text-sm flex flex-wrap gap-4">
-          <span>平均分：<strong>{{analysisDistributionData.mean.toFixed(1)}}</strong></span>
-          <span>中位數：<strong>{{analysisDistributionData.median.toFixed(1)}}</strong></span>
-          <span>標準差：<strong>{{analysisDistributionData.stddev.toFixed(1)}}</strong></span>
-          <span class="text-gray-500">共 {{analysisDistributionData.total}} 位</span>
-        </div>
-        <div style="position:relative;height:320px"><canvas ref="distributionCanvas"></canvas></div>
-        <div v-if="!analysisDistributionData || analysisDistributionData.total === 0" class="text-center text-gray-400 py-4">暫無數據</div>
-      </div>
-
-      <!-- 1.3 Trend -->
-      <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-        <h3 class="text-base font-bold text-gray-800 mb-3">
-          <i class="fas fa-chart-line text-blue-500 mr-1"></i>學期總分趨勢
-        </h3>
-        <div style="position:relative;height:340px"><canvas ref="trendCanvas"></canvas></div>
-        <div class="mt-3 pt-3 border-t">
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-semibold text-gray-700">
-              疊加學生個人趨勢 <span class="text-xs font-normal text-gray-400">(最多 5 位，已選 {{analysisTrendSelectedStudents.length}})</span>
-            </h4>
-            <button v-if="analysisTrendSelectedStudents.length > 0" @click="analysisClearTrendStudents" class="text-xs text-gray-500 hover:text-red-500">清除所選</button>
+        <!-- ==================== ANALYSIS TAB ==================== -->
+        <div v-if="currentView==='analysis'" class="h-full flex flex-col">
+          <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2 flex items-center gap-1 overflow-x-auto">
+            <button @click="analysisSetTab('class')"
+              class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
+              :class="analysisSubTab==='class' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
+              <i class="fas fa-users mr-1"></i>班級分析
+            </button>
+            <button @click="analysisSetTab('student')"
+              class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
+              :class="analysisSubTab==='student' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
+              <i class="fas fa-user mr-1"></i>學生分析
+            </button>
+            <button @click="analysisSetTab('crossYear')"
+              class="px-3 py-1.5 text-xs sm:text-sm rounded-lg transition whitespace-nowrap"
+              :class="analysisSubTab==='crossYear' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
+              <i class="fas fa-layer-group mr-1"></i>跨學年分析
+            </button>
           </div>
-          <div class="max-h-40 overflow-y-auto bg-gray-50 rounded-lg p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-            <label v-for="s in currentStudents" :key="s.id" class="flex items-center gap-1.5 text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white">
-              <input type="checkbox" :checked="analysisTrendSelectedStudents.includes(s.id)" @change="analysisToggleTrendStudent(s.id)" class="rounded border-gray-300">
-              <span class="text-gray-400">{{s.studentNumber}}</span>
-              <span class="truncate text-gray-700">{{s.studentName}}</span>
-            </label>
-          </div>
-        </div>
-      </div>
 
-      <!-- 1.4 Category Compare -->
-      <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-        <h3 class="text-base font-bold text-gray-800 mb-3">
-          <i class="fas fa-columns text-green-500 mr-1"></i>各範疇平均分比較
-        </h3>
-        <div style="position:relative;height:340px"><canvas ref="categoryCompareCanvas"></canvas></div>
-      </div>
-
-      <!-- 1.5 Rankings -->
-      <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-        <h3 class="text-base font-bold text-gray-800 mb-3">
-          <i class="fas fa-trophy text-yellow-500 mr-1"></i>學生排名
-        </h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs sm:text-sm" style="min-width:800px">
-            <thead class="bg-gray-50">
-              <tr>
-                <th @click="analysisSortRanking('yearlyRank')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">全年排名 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortRanking('studentNumber')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">學號 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th class="px-2 py-2 text-left whitespace-nowrap">姓名</th>
-                <th @click="analysisSortRanking('t1a3')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-blue-50">T1統測 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortRanking('t1exam')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-blue-50">T1考試 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortRanking('t2a3')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-green-50">T2統測 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortRanking('t2exam')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-green-50">T2考試 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th @click="analysisSortRanking('yearlyTotal')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-amber-50">全年總分 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                <th class="px-2 py-2 text-center whitespace-nowrap">排名趨勢</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in analysisRankingTableData" :key="r.studentId" class="border-t hover:bg-gray-50">
-                <td class="px-2 py-2 text-center font-medium text-gray-700">{{r.yearlyRank || '—'}}</td>
-                <td class="px-2 py-2 text-gray-700">{{r.studentNumber}}</td>
-                <td class="px-2 py-2 text-gray-800 font-medium">
-                  <span class="cursor-pointer hover:text-blue-600 hover:underline" @click="analysisSelectStudent(r.studentId); analysisSetTab('student')" title="查看學生分析">{{r.studentName}}</span>
-                </td>
-                <td class="px-2 py-2 text-center">{{r.t1a3 !== null ? r.t1a3 : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.t1exam !== null ? r.t1exam.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.t2a3 !== null ? r.t2a3 : '—'}}</td>
-                <td class="px-2 py-2 text-center">{{r.t2exam !== null ? r.t2exam.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center font-bold">{{r.yearlyTotal !== null ? r.yearlyTotal.toFixed(1) : '—'}}</td>
-                <td class="px-2 py-2 text-center">
-                  <span v-if="r.rankTrend === null" class="text-gray-300">—</span>
-                  <span v-else-if="r.rankTrend > 0" class="text-green-600 font-semibold"><i class="fas fa-arrow-up text-xs"></i> {{r.rankTrend}}</span>
-                  <span v-else-if="r.rankTrend < 0" class="text-red-600 font-semibold"><i class="fas fa-arrow-down text-xs"></i> {{Math.abs(r.rankTrend)}}</span>
-                  <span v-else class="text-gray-400"><i class="fas fa-arrow-right text-xs"></i></span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="analysisRankingTableData.length === 0" class="text-center text-gray-400 py-8">暫無數據</div>
-        </div>
-      </div>
-    </template>
-  </div>
-
-  <!-- ========= STUDENT ANALYSIS ========= -->
-  <div v-if="analysisSubTab==='student'" class="flex-1 overflow-y-auto p-3 sm:p-4">
-    <div v-if="!currentClass" class="flex items-center justify-center h-64 text-gray-400">
-      <div class="text-center">
-        <i class="fas fa-hand-point-left text-4xl mb-3"></i>
-        <p>請先從左側選擇學年和班別</p>
-      </div>
-    </div>
-    <template v-else>
-      <div class="flex flex-wrap items-center gap-3 mb-4 bg-white rounded-xl shadow p-3">
-        <label class="text-sm font-medium text-gray-700 shrink-0">選擇學生：</label>
-        <select :value="analysisStudentId || ''" @change="analysisSelectStudent($event.target.value || null)"
-          class="flex-1 min-w-0 max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">-- 請選擇學生 --</option>
-          <option v-for="s in currentStudents" :key="s.id" :value="s.id">{{s.studentNumber}} {{s.studentName}}</option>
-        </select>
-      </div>
-
-      <div v-if="!analysisSelectedStudent" class="text-center text-gray-400 py-16">
-        <i class="fas fa-user text-5xl mb-3"></i>
-        <p>請選擇一位學生以查看分析</p>
-      </div>
-
-      <template v-else>
-        <!-- 2.1 Overview Card -->
-        <div v-if="analysisStudentOverview" :style="bannerStyle" class="rounded-xl p-4 sm:p-5 text-white mb-4 shadow">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <h2 class="text-xl sm:text-2xl font-bold truncate">{{analysisStudentOverview.student.studentName}}</h2>
-              <p class="text-sm opacity-90">學號 {{analysisStudentOverview.student.studentNumber}} · {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></p>
+          <div v-if="analysisSubTab==='class'" class="flex-1 overflow-y-auto p-3 sm:p-4">
+            <div v-if="!currentClass" class="flex items-center justify-center h-64 text-gray-400">
+              <div class="text-center">
+                <i class="fas fa-hand-point-left text-4xl mb-3"></i>
+                <p>請先從左側選擇學年和班別</p>
+              </div>
             </div>
-            <div class="text-right">
-              <div class="text-3xl sm:text-4xl font-black">{{analysisStudentOverview.yearly !== null ? analysisStudentOverview.yearly.toFixed(1) : '—'}}</div>
-              <div class="text-xs opacity-80">全年總分</div>
-              <div v-if="analysisStudentOverview.yearlyRank" class="text-sm mt-1">
-                排名 第 <strong>{{analysisStudentOverview.yearlyRank}}</strong> / {{analysisStudentOverview.validYearlyCount || analysisStudentOverview.totalStudents}} 人
+            <template v-else>
+              <div class="flex flex-wrap gap-2 mb-4">
+                <button v-for="term in currentClass.terms" :key="term.id"
+                  @click="gradesSelectTerm(term.id)"
+                  class="px-3 py-1 text-sm rounded-lg border transition"
+                  :class="gradesTermId===term.id ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
+                  {{term.name}}
+                </button>
+              </div>
+
+              <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">
+                  <i class="fas fa-table text-blue-500 mr-1"></i>成績概覽
+                </h3>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs sm:text-sm" style="min-width:720px">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th @click="analysisSortOverview('name')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">項目 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th class="px-2 py-2 text-left whitespace-nowrap">類型</th>
+                        <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
+                        <th @click="analysisSortOverview('avg')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">平均 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('median')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">中位 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('max')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">最高 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('min')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">最低 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('stddev')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">標準差 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('passRate')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap text-green-700">合格率 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortOverview('excellentRate')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap text-purple-700">優秀率 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in analysisClassOverviewData.rows" :key="r.id" class="border-t hover:bg-gray-50">
+                        <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
+                        <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
+                        <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
+                        <td class="px-2 py-2 text-center">{{r.avg !== null ? r.avg.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.median !== null ? r.median.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.max !== null ? r.max.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.min !== null ? r.min.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.stddev !== null ? r.stddev.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center text-green-700">{{r.count > 0 ? r.passRate.toFixed(0) + '%' : '—'}}</td>
+                        <td class="px-2 py-2 text-center text-purple-700">{{r.count > 0 ? r.excellentRate.toFixed(0) + '%' : '—'}}</td>
+                      </tr>
+                      <tr v-if="analysisClassOverviewData.semester" class="border-t-2 bg-amber-50 font-bold">
+                        <td class="px-2 py-2 text-amber-800">{{analysisClassOverviewData.semester.name}}</td>
+                        <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded bg-amber-600 text-white">總分</span></td>
+                        <td class="px-2 py-2 text-center text-gray-500">100</td>
+                        <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.avg.toFixed(1)}}</td>
+                        <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.median.toFixed(1)}}</td>
+                        <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.max.toFixed(1)}}</td>
+                        <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.min.toFixed(1)}}</td>
+                        <td class="px-2 py-2 text-center">{{analysisClassOverviewData.semester.stddev.toFixed(1)}}</td>
+                        <td class="px-2 py-2 text-center text-green-700">{{analysisClassOverviewData.semester.passRate.toFixed(0)}}%</td>
+                        <td class="px-2 py-2 text-center text-purple-700">{{analysisClassOverviewData.semester.excellentRate.toFixed(0)}}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-if="analysisClassOverviewData.rows.length === 0" class="text-center text-gray-400 py-8">尚無評估項目</div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h3 class="text-base font-bold text-gray-800">
+                    <i class="fas fa-chart-bar text-orange-500 mr-1"></i>分數分佈直方圖
+                  </h3>
+                  <select :value="analysisDistributionKey || '__exam'" @change="analysisSetDistributionKey($event.target.value)"
+                    class="text-xs sm:text-sm border border-gray-300 rounded-lg px-2 py-1">
+                    <option v-for="opt in analysisDistributionOptions" :key="opt.key" :value="opt.key">{{opt.label}}</option>
+                  </select>
+                </div>
+                <div v-if="analysisDistributionData && analysisDistributionData.total > 0" class="bg-gray-50 rounded-lg p-2 mb-3 text-sm flex flex-wrap gap-4">
+                  <span>平均分：<strong>{{analysisDistributionData.mean.toFixed(1)}}</strong></span>
+                  <span>中位數：<strong>{{analysisDistributionData.median.toFixed(1)}}</strong></span>
+                  <span>標準差：<strong>{{analysisDistributionData.stddev.toFixed(1)}}</strong></span>
+                  <span class="text-gray-500">共 {{analysisDistributionData.total}} 位</span>
+                </div>
+                <div style="position:relative;height:320px"><canvas ref="distributionCanvas"></canvas></div>
+                <div v-if="!analysisDistributionData || analysisDistributionData.total === 0" class="text-center text-gray-400 py-4">暫無數據</div>
+              </div>
+
+              <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">
+                  <i class="fas fa-chart-line text-blue-500 mr-1"></i>學期總分趨勢
+                </h3>
+                <div style="position:relative;height:340px"><canvas ref="trendCanvas"></canvas></div>
+                <div class="mt-3 pt-3 border-t">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-semibold text-gray-700">
+                      疊加學生個人趨勢 <span class="text-xs font-normal text-gray-400">(最多 5 位，已選 {{analysisTrendSelectedStudents.length}})</span>
+                    </h4>
+                    <button v-if="analysisTrendSelectedStudents.length > 0" @click="analysisClearTrendStudents" class="text-xs text-gray-500 hover:text-red-500">清除所選</button>
+                  </div>
+                  <div class="max-h-40 overflow-y-auto bg-gray-50 rounded-lg p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
+                    <label v-for="s in currentStudents" :key="s.id" class="flex items-center gap-1.5 text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white">
+                      <input type="checkbox" :checked="analysisTrendSelectedStudents.includes(s.id)" @change="analysisToggleTrendStudent(s.id)" class="rounded border-gray-300">
+                      <span class="text-gray-400">{{s.studentNumber}}</span>
+                      <span class="truncate text-gray-700">{{s.studentName}}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">
+                  <i class="fas fa-columns text-green-500 mr-1"></i>各範疇平均分比較
+                </h3>
+                <div style="position:relative;height:340px"><canvas ref="categoryCompareCanvas"></canvas></div>
+              </div>
+
+              <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">
+                  <i class="fas fa-trophy text-yellow-500 mr-1"></i>學生排名
+                </h3>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs sm:text-sm" style="min-width:800px">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th @click="analysisSortRanking('yearlyRank')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">全年排名 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortRanking('studentNumber')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">學號 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th class="px-2 py-2 text-left whitespace-nowrap">姓名</th>
+                        <th @click="analysisSortRanking('t1a3')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-blue-50">T1統測 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortRanking('t1exam')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-blue-50">T1考試 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortRanking('t2a3')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-green-50">T2統測 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortRanking('t2exam')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-green-50">T2考試 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th @click="analysisSortRanking('yearlyTotal')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-amber-50">全年總分 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                        <th class="px-2 py-2 text-center whitespace-nowrap">排名趨勢</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="r in analysisRankingTableData" :key="r.studentId" class="border-t hover:bg-gray-50">
+                        <td class="px-2 py-2 text-center font-medium text-gray-700">{{r.yearlyRank || '—'}}</td>
+                        <td class="px-2 py-2 text-gray-700">{{r.studentNumber}}</td>
+                        <td class="px-2 py-2 text-gray-800 font-medium">
+                          <span class="cursor-pointer hover:text-blue-600 hover:underline" @click="analysisSelectStudent(r.studentId); analysisSetTab('student')" title="查看學生分析">{{r.studentName}}</span>
+                        </td>
+                        <td class="px-2 py-2 text-center">{{r.t1a3 !== null ? r.t1a3 : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.t1exam !== null ? r.t1exam.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.t2a3 !== null ? r.t2a3 : '—'}}</td>
+                        <td class="px-2 py-2 text-center">{{r.t2exam !== null ? r.t2exam.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center font-bold">{{r.yearlyTotal !== null ? r.yearlyTotal.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">
+                          <span v-if="r.rankTrend === null" class="text-gray-300">—</span>
+                          <span v-else-if="r.rankTrend > 0" class="text-green-600 font-semibold"><i class="fas fa-arrow-up text-xs"></i> {{r.rankTrend}}</span>
+                          <span v-else-if="r.rankTrend < 0" class="text-red-600 font-semibold"><i class="fas fa-arrow-down text-xs"></i> {{Math.abs(r.rankTrend)}}</span>
+                          <span v-else class="text-gray-400"><i class="fas fa-arrow-right text-xs"></i></span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-if="analysisRankingTableData.length === 0" class="text-center text-gray-400 py-8">暫無數據</div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div v-if="analysisSubTab==='student'" class="flex-1 overflow-y-auto p-3 sm:p-4">
+            <div v-if="!currentClass" class="flex items-center justify-center h-64 text-gray-400">
+              <div class="text-center">
+                <i class="fas fa-hand-point-left text-4xl mb-3"></i>
+                <p>請先從左側選擇學年和班別</p>
+              </div>
+            </div>
+            <template v-else>
+              <div class="flex flex-wrap items-center gap-3 mb-4 bg-white rounded-xl shadow p-3">
+                <label class="text-sm font-medium text-gray-700 shrink-0">選擇學生：</label>
+                <select :value="analysisStudentId || ''" @change="analysisSelectStudent($event.target.value || null)"
+                  class="flex-1 min-w-0 max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <option value="">-- 請選擇學生 --</option>
+                  <option v-for="s in currentStudents" :key="s.id" :value="s.id">{{s.studentNumber}} {{s.studentName}}</option>
+                </select>
+              </div>
+
+              <div v-if="!analysisSelectedStudent" class="text-center text-gray-400 py-16">
+                <i class="fas fa-user text-5xl mb-3"></i>
+                <p>請選擇一位學生以查看分析</p>
+              </div>
+
+              <template v-else>
+                <div v-if="analysisStudentOverview" :style="bannerStyle" class="rounded-xl p-4 sm:p-5 text-white mb-4 shadow">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <h2 class="text-xl sm:text-2xl font-bold truncate">{{analysisStudentOverview.student.studentName}}</h2>
+                      <p class="text-sm opacity-90">學號 {{analysisStudentOverview.student.studentNumber}} · {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></p>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-3xl sm:text-4xl font-black">{{analysisStudentOverview.yearly !== null ? analysisStudentOverview.yearly.toFixed(1) : '—'}}</div>
+                      <div class="text-xs opacity-80">全年總分</div>
+                      <div v-if="analysisStudentOverview.yearlyRank" class="text-sm mt-1">
+                        排名 第 <strong>{{analysisStudentOverview.yearlyRank}}</strong> / {{analysisStudentOverview.validYearlyCount || analysisStudentOverview.totalStudents}} 人
+                      </div>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 pt-4 border-t border-white/30">
+                    <div v-for="p in analysisStudentOverview.points" :key="p.label" class="bg-white/10 rounded-lg p-2">
+                      <div class="text-xs opacity-80">{{p.label}}</div>
+                      <div class="text-lg font-bold">{{p.value !== null ? (Number.isInteger(p.value) ? p.value : p.value.toFixed(1)) : '—'}}</div>
+                      <div class="text-xs opacity-70">班均 {{p.classAvg !== null ? p.classAvg.toFixed(1) : '—'}}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-list text-blue-500 mr-1"></i>各項分數對比
+                  </h3>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs sm:text-sm" style="min-width:720px">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th @click="analysisSortStudentScores('termName')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">學期 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th @click="analysisSortStudentScores('name')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">項目 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th class="px-2 py-2 text-left whitespace-nowrap">類型</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">學生分數</th>
+                          <th @click="analysisSortStudentScores('studentPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">百分制 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th @click="analysisSortStudentScores('classAvgPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">班均 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th @click="analysisSortStudentScores('diff')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">差距 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">表現</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in analysisStudentScoresTable" :key="r.id + r.termName" class="border-t hover:bg-gray-50">
+                          <td class="px-2 py-2 text-gray-500">{{r.termName}}</td>
+                          <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
+                          <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
+                          <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
+                          <td class="px-2 py-2 text-center font-medium">{{r.studentScore !== null ? r.studentScore : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.studentPct !== null ? r.studentPct.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center text-gray-500">{{r.classAvgPct !== null ? r.classAvgPct.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center" :class="r.diff === null ? 'text-gray-400' : (r.diff > 0 ? 'text-green-600 font-medium' : (r.diff < 0 ? 'text-red-600 font-medium' : 'text-gray-500'))">
+                            {{r.diff === null ? '—' : (r.diff > 0 ? '+' : '') + r.diff.toFixed(1)}}
+                          </td>
+                          <td class="px-2 py-2 text-center">
+                            <span v-if="r.diff === null" class="text-gray-300 text-xs">—</span>
+                            <span v-else-if="r.diff > 0" class="text-xs text-green-600"><i class="fas fa-arrow-up mr-0.5"></i>高於平均</span>
+                            <span v-else-if="r.diff < 0" class="text-xs text-red-600"><i class="fas fa-arrow-down mr-0.5"></i>低於平均</span>
+                            <span v-else class="text-xs text-gray-500">等於平均</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div v-if="analysisStudentScoresTable.length === 0" class="text-center text-gray-400 py-8">暫無數據</div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                  <div class="bg-white rounded-xl shadow p-3 sm:p-4">
+                    <h3 class="text-base font-bold text-gray-800 mb-3">
+                      <i class="fas fa-broadcast-tower text-purple-500 mr-1"></i>各範疇表現雷達圖
+                    </h3>
+                    <div style="position:relative;height:340px"><canvas ref="studentRadarCanvas"></canvas></div>
+                  </div>
+                  <div class="bg-white rounded-xl shadow p-3 sm:p-4">
+                    <h3 class="text-base font-bold text-gray-800 mb-3">
+                      <i class="fas fa-chart-bar text-blue-500 mr-1"></i>各項對比
+                    </h3>
+                    <div style="position:relative;height:340px"><canvas ref="studentCompareCanvas"></canvas></div>
+                  </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-chart-line text-green-500 mr-1"></i>學期趨勢
+                  </h3>
+                  <div style="position:relative;height:340px"><canvas ref="studentTrendCanvas"></canvas></div>
+                </div>
+
+                <div v-if="analysisStudentStrengths" class="bg-white rounded-xl shadow p-4 mb-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-chart-pie text-orange-500 mr-1"></i>成績分析摘要
+                  </h3>
+                  <div class="space-y-3">
+                    <div v-if="analysisStudentStrengths.strengths.length > 0" class="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <h4 class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-check-circle mr-1"></i>強項</h4>
+                      <ul class="text-sm text-green-700 space-y-1">
+                        <li v-for="s in analysisStudentStrengths.strengths" :key="s.category">
+                          • {{s.category}}表現優秀，學生 <strong>{{s.value.toFixed(1)}}</strong> 分（百分制），高於班級平均 <strong>{{s.diff.toFixed(1)}}</strong> 分
+                        </li>
+                      </ul>
+                    </div>
+                    <div v-if="analysisStudentStrengths.weaknesses.length > 0" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <h4 class="font-semibold text-red-800 text-sm mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>需加強</h4>
+                      <ul class="text-sm text-red-700 space-y-1">
+                        <li v-for="s in analysisStudentStrengths.weaknesses" :key="s.category">
+                          • {{s.category}}表現需加強，學生 <strong>{{s.value.toFixed(1)}}</strong> 分（百分制），低於班級平均 <strong>{{Math.abs(s.diff).toFixed(1)}}</strong> 分
+                        </li>
+                      </ul>
+                    </div>
+                    <div v-if="analysisStudentStrengths.trendNotes.length > 0" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <h4 class="font-semibold text-blue-800 text-sm mb-2"><i class="fas fa-chart-line mr-1"></i>趨勢</h4>
+                      <ul class="text-sm text-blue-700 space-y-1">
+                        <li v-for="(t, i) in analysisStudentStrengths.trendNotes" :key="i">
+                          • {{t.from}} 到 {{t.to}} {{t.diff > 0 ? '進步了 ' + t.diff.toFixed(1) : '退步了 ' + Math.abs(t.diff).toFixed(1)}} 分{{t.rankStr}}
+                        </li>
+                      </ul>
+                    </div>
+                    <div v-if="analysisStudentStrengths.strengths.length === 0 && analysisStudentStrengths.weaknesses.length === 0 && analysisStudentStrengths.trendNotes.length === 0" class="text-center text-gray-400 py-4 text-sm">
+                      整體表現接近班級平均水平
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </template>
+          </div>
+
+          <div v-if="analysisSubTab==='crossYear'" class="flex-1 overflow-y-auto p-3 sm:p-4">
+            <div class="max-w-5xl mx-auto">
+              <div v-if="!analysisCrossYearStudent" class="bg-white rounded-xl shadow p-4 mb-4">
+                <h3 class="text-base font-bold text-gray-800 mb-3">
+                  <i class="fas fa-search text-blue-500 mr-1"></i>搜索學生
+                </h3>
+                <input v-model="analysisCrossYearSearchQuery" type="text" placeholder="輸入學生姓名..."
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+                <div v-if="analysisCrossYearSearchResults.length > 0" class="mt-3 max-h-64 overflow-y-auto border rounded-lg">
+                  <div v-for="gs in analysisCrossYearSearchResults" :key="gs.id" @click="analysisSelectCrossYearStudent(gs)"
+                    class="px-3 py-2 cursor-pointer hover:bg-blue-50 border-b last:border-b-0 text-sm flex items-center justify-between">
+                    <span class="font-medium text-gray-800">{{gs.name}}</span>
+                    <span class="text-xs text-gray-500">{{(gs.records || []).length}} 個學年記錄</span>
+                  </div>
+                </div>
+                <div v-else-if="analysisCrossYearSearchQuery.trim().length > 0" class="mt-3 text-center text-gray-400 text-sm py-4">找不到符合的學生</div>
+                <div v-else class="mt-3 text-center text-gray-400 text-xs py-2">輸入姓名以搜尋</div>
+              </div>
+
+              <div v-if="analysisCrossYearStudent">
+                <div class="bg-white rounded-xl shadow p-4 mb-4 flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 class="text-xl font-bold text-gray-800">{{analysisCrossYearStudent.name}}</h2>
+                    <p class="text-sm text-gray-500">跨學年分析 · 找到 {{analysisCrossYearResults.length}} 個學年記錄</p>
+                  </div>
+                  <button @click="analysisClearCrossYearStudent" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    <i class="fas fa-times mr-1"></i>更換學生
+                  </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-history text-blue-500 mr-1"></i>跨學年記錄
+                  </h3>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs sm:text-sm" style="min-width:750px">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-2 py-2 text-left whitespace-nowrap">學年</th>
+                          <th class="px-2 py-2 text-left whitespace-nowrap">班別</th>
+                          <th class="px-2 py-2 text-left whitespace-nowrap">科目</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">T1統測</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">T1考試</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">T2統測</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">T2考試</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap bg-amber-50">全年總分</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">班級排名</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in analysisCrossYearResults" :key="r.yearId + r.classId" class="border-t hover:bg-gray-50">
+                          <td class="px-2 py-2 font-medium text-gray-800">{{r.yearName}}</td>
+                          <td class="px-2 py-2 text-gray-700">{{r.className}}</td>
+                          <td class="px-2 py-2 text-gray-700">
+                            {{r.subject || '—'}}
+                            <span v-if="r.classType === 'elective'" class="text-xs text-purple-500 ml-1">★選修</span>
+                          </td>
+                          <td class="px-2 py-2 text-center">{{r.t1a3 !== null ? r.t1a3 : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.t1Exam !== null ? r.t1Exam.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.t2a3 !== null ? r.t2a3 : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.t2Exam !== null ? r.t2Exam.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center font-bold bg-amber-50">{{r.yearlyTotal !== null ? r.yearlyTotal.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center">
+                            <span v-if="r.yearlyRank">{{r.yearlyRank}}/{{r.totalInClass}}</span>
+                            <span v-else class="text-gray-400">—</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div v-if="analysisCrossYearResults.length === 0" class="text-center text-gray-400 py-8">尚無記錄</div>
+                  </div>
+                </div>
+
+                <div v-if="analysisCrossYearTrend && analysisCrossYearTrend.labels.length > 0" class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-chart-line text-green-500 mr-1"></i>跨學年趨勢
+                  </h3>
+                  <div style="position:relative;height:340px"><canvas ref="crossYearTrendCanvas"></canvas></div>
+                </div>
+
+                <div v-if="analysisCrossYearCompare && analysisCrossYearCompare.rows.length > 0" class="bg-white rounded-xl shadow p-3 sm:p-4">
+                  <h3 class="text-base font-bold text-gray-800 mb-3">
+                    <i class="fas fa-table text-orange-500 mr-1"></i>跨年比較
+                  </h3>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs sm:text-sm" style="min-width:500px">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-2 py-2 text-left whitespace-nowrap">比較項目</th>
+                          <th v-for="y in analysisCrossYearCompare.years" :key="y" class="px-2 py-2 text-center whitespace-nowrap">{{y}}</th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">趨勢</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, idx) in analysisCrossYearCompare.rows" :key="idx" class="border-t hover:bg-gray-50">
+                          <td class="px-2 py-2 font-medium text-gray-700">{{row.metric}}</td>
+                          <td v-for="(val, i) in row.values" :key="i" class="px-2 py-2 text-center">
+                            <template v-if="row.format === 'rank'">
+                              <span v-if="val.value !== null && val.value !== undefined">{{val.value}}/{{val.total}}</span>
+                              <span v-else class="text-gray-400">—</span>
+                            </template>
+                            <template v-else-if="row.format === 'int'">
+                              <span v-if="val.value !== null && val.value !== undefined">{{val.value}}</span>
+                              <span v-else class="text-gray-400">—</span>
+                            </template>
+                            <template v-else>
+                              <span v-if="val.value !== null && val.value !== undefined">{{val.value.toFixed(1)}}</span>
+                              <span v-else class="text-gray-400">—</span>
+                            </template>
+                          </td>
+                          <td class="px-2 py-2 text-center">
+                            <span v-if="row.trend === null" class="text-gray-300">—</span>
+                            <span v-else-if="row.trend > 0" class="text-green-600 font-semibold">
+                              <i class="fas fa-arrow-up text-xs"></i> 
+                              {{row.format === 'int' || row.format === 'rank' ? row.trend : '+' + row.trend.toFixed(1)}}
+                            </span>
+                            <span v-else-if="row.trend < 0" class="text-red-600 font-semibold">
+                              <i class="fas fa-arrow-down text-xs"></i> 
+                              {{row.format === 'int' || row.format === 'rank' ? Math.abs(row.trend) : Math.abs(row.trend).toFixed(1)}}
+                            </span>
+                            <span v-else class="text-gray-500"><i class="fas fa-minus text-xs"></i></span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 pt-4 border-t border-white/30">
-            <div v-for="p in analysisStudentOverview.points" :key="p.label" class="bg-white/10 rounded-lg p-2">
-              <div class="text-xs opacity-80">{{p.label}}</div>
-              <div class="text-lg font-bold">{{p.value !== null ? (Number.isInteger(p.value) ? p.value : p.value.toFixed(1)) : '—'}}</div>
-              <div class="text-xs opacity-70">班均 {{p.classAvg !== null ? p.classAvg.toFixed(1) : '—'}}</div>
-            </div>
-          </div>
         </div>
-
-        <!-- 2.2 Score Comparison Table -->
-        <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-list text-blue-500 mr-1"></i>各項分數對比
-          </h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs sm:text-sm" style="min-width:720px">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th @click="analysisSortStudentScores('termName')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">學期 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                  <th @click="analysisSortStudentScores('name')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">項目 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">類型</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">學生分數</th>
-                  <th @click="analysisSortStudentScores('studentPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">百分制 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                  <th @click="analysisSortStudentScores('classAvgPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">班均 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                  <th @click="analysisSortStudentScores('diff')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">差距 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">表現</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in analysisStudentScoresTable" :key="r.id + r.termName" class="border-t hover:bg-gray-50">
-                  <td class="px-2 py-2 text-gray-500">{{r.termName}}</td>
-                  <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
-                  <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
-                  <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
-                  <td class="px-2 py-2 text-center font-medium">{{r.studentScore !== null ? r.studentScore : '—'}}</td>
-                  <td class="px-2 py-2 text-center">{{r.studentPct !== null ? r.studentPct.toFixed(1) : '—'}}</td>
-                  <td class="px-2 py-2 text-center text-gray-500">{{r.classAvgPct !== null ? r.classAvgPct.toFixed(1) : '—'}}</td>
-                  <td class="px-2 py-2 text-center" :class="r.diff === null ? 'text-gray-400' : (r.diff > 0 ? 'text-green-600 font-medium' : (r.diff < 0 ? 'text-red-600 font-medium' : 'text-gray-500'))">
-                    {{r.diff === null ? '—' : (r.diff > 0 ? '+' : '') + r.diff.toFixed(1)}}
-                  </td>
-                  <td class="px-2 py-2 text-center">
-                    <span v-if="r.diff === null" class="text-gray-300 text-xs">—</span>
-                    <span v-else-if="r.diff > 0" class="text-xs text-green-600"><i class="fas fa-arrow-up mr-0.5"></i>高於平均</span>
-                    <span v-else-if="r.diff < 0" class="text-xs text-red-600"><i class="fas fa-arrow-down mr-0.5"></i>低於平均</span>
-                    <span v-else class="text-xs text-gray-500">等於平均</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="analysisStudentScoresTable.length === 0" class="text-center text-gray-400 py-8">暫無數據</div>
-          </div>
-        </div>
-
-        <!-- 2.3 + 2.4 Radar & Bar Side-by-side -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <div class="bg-white rounded-xl shadow p-3 sm:p-4">
-            <h3 class="text-base font-bold text-gray-800 mb-3">
-              <i class="fas fa-broadcast-tower text-purple-500 mr-1"></i>各範疇表現雷達圖
-            </h3>
-            <div style="position:relative;height:340px"><canvas ref="studentRadarCanvas"></canvas></div>
-          </div>
-          <div class="bg-white rounded-xl shadow p-3 sm:p-4">
-            <h3 class="text-base font-bold text-gray-800 mb-3">
-              <i class="fas fa-chart-bar text-blue-500 mr-1"></i>各項對比
-            </h3>
-            <div style="position:relative;height:340px"><canvas ref="studentCompareCanvas"></canvas></div>
-          </div>
-        </div>
-
-        <!-- 2.5 Trend -->
-        <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-chart-line text-green-500 mr-1"></i>學期趨勢
-          </h3>
-          <div style="position:relative;height:340px"><canvas ref="studentTrendCanvas"></canvas></div>
-        </div>
-
-        <!-- 2.6 Strengths Analysis -->
-        <div v-if="analysisStudentStrengths" class="bg-white rounded-xl shadow p-4 mb-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-chart-pie text-orange-500 mr-1"></i>成績分析摘要
-          </h3>
-          <div class="space-y-3">
-            <div v-if="analysisStudentStrengths.strengths.length > 0" class="bg-green-50 border border-green-200 rounded-lg p-3">
-              <h4 class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-check-circle mr-1"></i>強項</h4>
-              <ul class="text-sm text-green-700 space-y-1">
-                <li v-for="s in analysisStudentStrengths.strengths" :key="s.category">
-                  • {{s.category}}表現優秀，學生 <strong>{{s.value.toFixed(1)}}</strong> 分（百分制），高於班級平均 <strong>{{s.diff.toFixed(1)}}</strong> 分
-                </li>
-              </ul>
-            </div>
-            <div v-if="analysisStudentStrengths.weaknesses.length > 0" class="bg-red-50 border border-red-200 rounded-lg p-3">
-              <h4 class="font-semibold text-red-800 text-sm mb-2"><i class="fas fa-exclamation-triangle mr-1"></i>需加強</h4>
-              <ul class="text-sm text-red-700 space-y-1">
-                <li v-for="s in analysisStudentStrengths.weaknesses" :key="s.category">
-                  • {{s.category}}表現需加強，學生 <strong>{{s.value.toFixed(1)}}</strong> 分（百分制），低於班級平均 <strong>{{Math.abs(s.diff).toFixed(1)}}</strong> 分
-                </li>
-              </ul>
-            </div>
-            <div v-if="analysisStudentStrengths.trendNotes.length > 0" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <h4 class="font-semibold text-blue-800 text-sm mb-2"><i class="fas fa-chart-line mr-1"></i>趨勢</h4>
-              <ul class="text-sm text-blue-700 space-y-1">
-                <li v-for="(t, i) in analysisStudentStrengths.trendNotes" :key="i">
-                  • {{t.from}} 到 {{t.to}} {{t.diff > 0 ? '進步了 ' + t.diff.toFixed(1) : '退步了 ' + Math.abs(t.diff).toFixed(1)}} 分{{t.rankStr}}
-                </li>
-              </ul>
-            </div>
-            <div v-if="analysisStudentStrengths.strengths.length === 0 && analysisStudentStrengths.weaknesses.length === 0 && analysisStudentStrengths.trendNotes.length === 0" class="text-center text-gray-400 py-4 text-sm">
-              整體表現接近班級平均水平
-            </div>
-          </div>
-        </div>
-      </template>
-    </template>
-  </div>
-
-  <!-- ========= CROSS-YEAR ANALYSIS ========= -->
-  <div v-if="analysisSubTab==='crossYear'" class="flex-1 overflow-y-auto p-3 sm:p-4">
-    <div class="max-w-5xl mx-auto">
-      <div v-if="!analysisCrossYearStudent" class="bg-white rounded-xl shadow p-4 mb-4">
-        <h3 class="text-base font-bold text-gray-800 mb-3">
-          <i class="fas fa-search text-blue-500 mr-1"></i>搜索學生
-        </h3>
-        <input v-model="analysisCrossYearSearchQuery" type="text" placeholder="輸入學生姓名..."
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
-        <div v-if="analysisCrossYearSearchResults.length > 0" class="mt-3 max-h-64 overflow-y-auto border rounded-lg">
-          <div v-for="gs in analysisCrossYearSearchResults" :key="gs.id" @click="analysisSelectCrossYearStudent(gs)"
-            class="px-3 py-2 cursor-pointer hover:bg-blue-50 border-b last:border-b-0 text-sm flex items-center justify-between">
-            <span class="font-medium text-gray-800">{{gs.name}}</span>
-            <span class="text-xs text-gray-500">{{(gs.records || []).length}} 個學年記錄</span>
-          </div>
-        </div>
-        <div v-else-if="analysisCrossYearSearchQuery.trim().length > 0" class="mt-3 text-center text-gray-400 text-sm py-4">找不到符合的學生</div>
-        <div v-else class="mt-3 text-center text-gray-400 text-xs py-2">輸入姓名以搜尋</div>
-      </div>
-
-      <div v-if="analysisCrossYearStudent">
-        <div class="bg-white rounded-xl shadow p-4 mb-4 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h2 class="text-xl font-bold text-gray-800">{{analysisCrossYearStudent.name}}</h2>
-            <p class="text-sm text-gray-500">跨學年分析 · 找到 {{analysisCrossYearResults.length}} 個學年記錄</p>
-          </div>
-          <button @click="analysisClearCrossYearStudent" class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-            <i class="fas fa-times mr-1"></i>更換學生
-          </button>
-        </div>
-
-        <!-- 3.1 Records Table -->
-        <div class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-history text-blue-500 mr-1"></i>跨學年記錄
-          </h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs sm:text-sm" style="min-width:750px">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">學年</th>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">班別</th>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">科目</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">T1統測</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">T1考試</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">T2統測</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">T2考試</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap bg-amber-50">全年總分</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">班級排名</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in analysisCrossYearResults" :key="r.yearId + r.classId" class="border-t hover:bg-gray-50">
-                  <td class="px-2 py-2 font-medium text-gray-800">{{r.yearName}}</td>
-                  <td class="px-2 py-2 text-gray-700">{{r.className}}</td>
-                  <td class="px-2 py-2 text-gray-700">
-                    {{r.subject || '—'}}
-                    <span v-if="r.classType === 'elective'" class="text-xs text-purple-500 ml-1">★選修</span>
-                  </td>
-                  <td class="px-2 py-2 text-center">{{r.t1a3 !== null ? r.t1a3 : '—'}}</td>
-                  <td class="px-2 py-2 text-center">{{r.t1Exam !== null ? r.t1Exam.toFixed(1) : '—'}}</td>
-                  <td class="px-2 py-2 text-center">{{r.t2a3 !== null ? r.t2a3 : '—'}}</td>
-                  <td class="px-2 py-2 text-center">{{r.t2Exam !== null ? r.t2Exam.toFixed(1) : '—'}}</td>
-                  <td class="px-2 py-2 text-center font-bold bg-amber-50">{{r.yearlyTotal !== null ? r.yearlyTotal.toFixed(1) : '—'}}</td>
-                  <td class="px-2 py-2 text-center">
-                    <span v-if="r.yearlyRank">{{r.yearlyRank}}/{{r.totalInClass}}</span>
-                    <span v-else class="text-gray-400">—</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="analysisCrossYearResults.length === 0" class="text-center text-gray-400 py-8">尚無記錄</div>
-          </div>
-        </div>
-
-        <!-- 3.2 Trend Chart -->
-        <div v-if="analysisCrossYearTrend && analysisCrossYearTrend.labels.length > 0" class="bg-white rounded-xl shadow p-3 sm:p-4 mb-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-chart-line text-green-500 mr-1"></i>跨學年趨勢
-          </h3>
-          <div style="position:relative;height:340px"><canvas ref="crossYearTrendCanvas"></canvas></div>
-        </div>
-
-        <!-- 3.3 Comparison Table -->
-        <div v-if="analysisCrossYearCompare && analysisCrossYearCompare.rows.length > 0" class="bg-white rounded-xl shadow p-3 sm:p-4">
-          <h3 class="text-base font-bold text-gray-800 mb-3">
-            <i class="fas fa-table text-orange-500 mr-1"></i>跨年比較
-          </h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs sm:text-sm" style="min-width:500px">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-2 py-2 text-left whitespace-nowrap">比較項目</th>
-                  <th v-for="y in analysisCrossYearCompare.years" :key="y" class="px-2 py-2 text-center whitespace-nowrap">{{y}}</th>
-                  <th class="px-2 py-2 text-center whitespace-nowrap">趨勢</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in analysisCrossYearCompare.rows" :key="idx" class="border-t hover:bg-gray-50">
-                  <td class="px-2 py-2 font-medium text-gray-700">{{row.metric}}</td>
-                  <td v-for="(val, i) in row.values" :key="i" class="px-2 py-2 text-center">
-                    <template v-if="row.format === 'rank'">
-                      <span v-if="val.value !== null && val.value !== undefined">{{val.value}}/{{val.total}}</span>
-                      <span v-else class="text-gray-400">—</span>
-                    </template>
-                    <template v-else-if="row.format === 'int'">
-                      <span v-if="val.value !== null && val.value !== undefined">{{val.value}}</span>
-                      <span v-else class="text-gray-400">—</span>
-                    </template>
-                    <template v-else>
-                      <span v-if="val.value !== null && val.value !== undefined">{{val.value.toFixed(1)}}</span>
-                      <span v-else class="text-gray-400">—</span>
-                    </template>
-                  </td>
-                  <td class="px-2 py-2 text-center">
-                    <span v-if="row.trend === null" class="text-gray-300">—</span>
-                    <span v-else-if="row.trend > 0" class="text-green-600 font-semibold">
-                      <i class="fas fa-arrow-up text-xs"></i> 
-                      {{row.format === 'int' || row.format === 'rank' ? row.trend : '+' + row.trend.toFixed(1)}}
-                    </span>
-                    <span v-else-if="row.trend < 0" class="text-red-600 font-semibold">
-                      <i class="fas fa-arrow-down text-xs"></i> 
-                      {{row.format === 'int' || row.format === 'rank' ? Math.abs(row.trend) : Math.abs(row.trend).toFixed(1)}}
-                    </span>
-                    <span v-else class="text-gray-500"><i class="fas fa-minus text-xs"></i></span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
         <!-- ==================== SETTINGS TAB ==================== -->
         <div v-if="currentView==='settings'" class="p-3 sm:p-4 lg:p-6">
