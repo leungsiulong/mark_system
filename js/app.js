@@ -1,12 +1,13 @@
 // ================================================================
-// Main Application (v12 — data analysis with Chart.js)
+// Main Application (v13 — mobile load optimization, auto-term, scoring restructure)
 // ================================================================
 const { createApp } = Vue;
 
 createApp({
   data() {
     return {
-      loading: true, error: null, academicYears: [], globalStudents: [],
+      loading: true, loadingText: '正在載入數據...', loadingProgress: 0,
+      error: null, academicYears: [], globalStudents: [],
       settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{} },
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
       leftPanelOpen: true, expandedYears: {},
@@ -45,7 +46,8 @@ createApp({
       ],
 
       scoringSubTab: 'settings',
-      scoringAccordion: { ut: true, exam: false, yearly: false, custom: false },
+      // ★ v13: Removed 'custom' accordion, added 'attribution' (item attribution section, expanded by default)
+      scoringAccordion: { attribution: true, ut: true, exam: false, yearly: false },
       scoringSaveStatus: '',
       scoringTooltip: null,
       scoringCopyMenuOpen: false,
@@ -61,7 +63,6 @@ createApp({
 
       customCatColors: CUSTOM_CAT_COLORS,
 
-      // ★ v12: Analysis states
       analysisSubTab: 'class',
       analysisStudentId: null,
       analysisDistributionKey: null,
@@ -257,7 +258,6 @@ createApp({
       this.initScoringWeights();
       this.gradesFailPercent = null;
       this.scoringReportHighlight = null;
-      // ★ v12: Reset analysis state on class change
       this.analysisStudentId = null;
       this.analysisTrendSelectedStudents = [];
       this.analysisDistributionKey = null;
@@ -266,7 +266,6 @@ createApp({
       });
     },
     gradesTermId() {
-      // ★ v12: Re-render analysis charts when term changes
       this.$nextTick(() => {
         if (this.currentView === 'analysis') setTimeout(() => this.analysisRenderAllCharts(), 80);
       });
@@ -278,7 +277,6 @@ createApp({
         this.calendarEventPopover = null;
         this.calendarMoreEventsModal = null;
       }
-      // ★ v12: Render / destroy analysis charts
       if (nv === 'analysis') {
         this.$nextTick(() => setTimeout(() => this.analysisRenderAllCharts(), 120));
       } else {
@@ -290,7 +288,6 @@ createApp({
       handler() { if (this._scoringSkipWatch) return; this.scoringDebouncedAutoSave(); },
       deep: true
     },
-    // ★ v12: Analysis watchers
     analysisSubTab() {
       this.$nextTick(() => setTimeout(() => this.analysisRenderAllCharts(), 80));
     },
@@ -525,7 +522,7 @@ createApp({
   async mounted() {
     if(window.innerWidth<1024) this.leftPanelOpen=false;
     this._injectCustomStyles();
-    this._analysisCharts = {}; // ★ v12: non-reactive chart storage
+    this._analysisCharts = {};
     await this.loadAllData();
     this.initScoringWeights();
     document.addEventListener('keydown',(e)=>{

@@ -1,5 +1,5 @@
 // ================================================================
-// Scoring Module (v6 — pass threshold based on class type, custom categories)
+// Scoring Module (v7 — restructured: attribution section separated, removed manual save/CSV)
 // ================================================================
 const ScoringMethods = {
   scoringSetSubTab(tab) { this.scoringSubTab = tab; },
@@ -53,6 +53,7 @@ const ScoringMethods = {
     }, 1500);
   },
 
+  // ★ v7: Manual saveScoringConfig kept as helper (called internally if ever needed), not bound to UI button
   async saveScoringConfig() {
     if (!this.currentAcademicYearId || !this.currentClassId) return;
     if (!this.scoringConfigValid) { this.addToast('請修正權重設定錯誤後再儲存', 'warning'); return; }
@@ -251,6 +252,7 @@ const ScoringMethods = {
     else { this.scoringReportSortKey = key; this.scoringReportSortAsc = key === 'studentNumber'; }
   },
 
+  // ★ v7: exportCSV is now called from the grades tab toolbar button
   exportCSV() {
     if (!this.gradesTerm || !this.gradesSortedStudents.length) { this.addToast('無數據可匯出','warning'); return; }
     const ord = this.gradesOrderedAssessments, stu = this.gradesSortedStudents;
@@ -296,7 +298,6 @@ const ScoringComputed = {
     return this.scoringUTWeightTotal === 100 && this.scoringA1A2WeightTotal === 100 &&
       this.scoringA1InternalTotal === this.scoringWeightsLocal.exam.a1Ratio && this.scoringYearlyWeightTotal === 100;
   },
-  // ★ v6: Pass threshold - 40 for electives & senior classes, 50 otherwise
   scoringPassThreshold() {
     if (!this.currentClass) return 50;
     if (this.currentClass.classType === 'elective') return 40;
@@ -374,7 +375,6 @@ const ScoringComputed = {
     data.sort((a,b)=>{ let va=a[k],vb=b[k]; if(va==null)va=asc?Infinity:-Infinity; if(vb==null)vb=asc?Infinity:-Infinity; if(k==='studentNumber'){va=parseInt(va)||0;vb=parseInt(vb)||0;} return asc?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); });
     return data;
   },
-  // ★ v6: Use dynamic pass threshold based on class
   scoringReportStats() {
     const data = this.scoringReportRankedData;
     const fields = ['t1a3','t1ExamTotal','t2a3','t2ExamTotal','yearlyTotal'];

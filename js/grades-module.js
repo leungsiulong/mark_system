@@ -1,13 +1,18 @@
 // ================================================================
-// Grades Module (v8 — elective class column sort, elective pass=40)
+// Grades Module (v9 — date-based auto term selection)
 // ================================================================
 
 const GradesMethods = {
 
+  // ★ v9: Auto-select term based on current date
+  // - Sep to Jan (month 9-12, 1) → first term (上學期)
+  // - Feb to Aug (month 2-8) → second term (下學期)
+  // Only auto-select when no valid term is currently selected (preserves user's manual choice)
   gradesAutoSelectTerm() {
     if (this.currentClass && this.currentClass.terms && this.currentClass.terms.length > 0) {
-      if (!this.gradesTermId || !this.currentClass.terms.find(t => t.id === this.gradesTermId))
-        this.gradesTermId = this.currentClass.terms[0].id;
+      if (!this.gradesTermId || !this.currentClass.terms.find(t => t.id === this.gradesTermId)) {
+        this.gradesTermId = this._autoSelectTermByDate(this.currentClass, new Date());
+      }
     } else {
       this.gradesTermId = null;
     }
@@ -854,7 +859,6 @@ const GradesComputed = {
   gradesHasUT() { return this.gradesOrderedAssessments.some(a => a.type === 'unified_test'); },
   gradesHasExam() { return this.gradesOrderedAssessments.some(a => a.type === 'exam'); },
 
-  // ★ v8: For electives, sort by origin class name then by student number
   gradesSortedStudents() {
     const arr = [...this.currentStudents];
     const isElective = this.currentClass && this.currentClass.classType === 'elective';
@@ -906,7 +910,6 @@ const GradesComputed = {
   },
   gradesDetailAssessment() { if (!this.gradesDetailPanel) return null; return this.gradesOrderedAssessments.find(a => a.id === this.gradesDetailPanel.assessmentId) || null; },
   gradesDetailPanelStyle() { if (!this.gradesDetailPanel) return {}; const w=Math.min(320,window.innerWidth-16); return { position:'fixed', top:this.gradesDetailPanel.y+'px', left:this.gradesDetailPanel.x+'px', zIndex:9999, width:w+'px' }; },
-  // ★ v8: Electives are high school subjects, pass = 40
   gradesAutoFailPercent() {
     if (!this.currentClass) return 50;
     if (this.currentClass.classType === 'elective') return 40;

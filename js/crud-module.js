@@ -1,13 +1,29 @@
 // ================================================================
-// CRUD Operations (v8 — split class/subject, in-memory migration)
+// CRUD Operations (v9 — parallel loading for mobile performance)
 // ================================================================
 const CrudMethods = {
+
+  // ★ v9: Completely rewritten load with Promise.all parallelism
+  // Previously: sequential awaits inside nested for-loops caused 600+ serial HTTP requests.
+  // Now: parallel requests at every layer reduce total wait from ~minutes to seconds on mobile.
   async loadAllData() {
     try {
       this.loading = true;
-      const sd = await db.collection('settings').doc('main').get();
-      if (sd.exists) {
-        const d = sd.data();
+      this.loadingText = '正在連接伺服器...';
+      this.loadingProgress = 5;
+
+      // Step 1: Load settings + academicYears list + globalStudents in parallel
+      this.loadingText = '正在載入基本資料...';
+      const [settingsSnap, yearsSnap, globalSnap] = await Promise.all([
+        db.collection('settings').doc('main').get(),
+        db.collection('academicYears').orderBy('createdAt', 'desc').get(),
+        db.collection('globalStudents').get()
+      ]);
+      this.loadingProgress = 20;
+
+      // Process settings
+      if (settingsSnap.exists) {
+        const d = settingsSnap.data();
         this.settings = { ...this.settings, ...d };
         if (d.themeColor) this.currentTheme = d.themeColor;
         if (d.tabOrder && Array.isArray(d.tabOrder)) {
@@ -17,19 +33,35 @@ const CrudMethods = {
         }
         if (d.activeQuickNavKeys && Array.isArray(d.activeQuickNavKeys)) this.activeQuickNavKeys = d.activeQuickNavKeys;
       }
-      const ys = await db.collection('academicYears').orderBy('createdAt', 'desc').get();
-      const years = [];
-      for (const yD of ys.docs) {
+
+      // Process global students
+      this.globalStudents = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (yearsSnap.docs.length === 0) {
+        this.academicYears = [];
+        this.loadingProgress = 100;
+        this.loading = false;
+        return;
+      }
+
+      // Step 2: Load all classes for all years IN PARALLEL
+      this.loadingText = '正在載入班別資料...';
+      const yearDocs = yearsSnap.docs;
+      const classesPerYearPromises = yearDocs.map(yD =>
+        db.collection('academicYears').doc(yD.id).collection('classes').orderBy('createdAt').get()
+      );
+      const classesPerYearSnaps = await Promise.all(classesPerYearPromises);
+      this.loadingProgress = 40;
+
+      // Build year objects with class shells
+      const years = yearDocs.map((yD, i) => {
         const year = { id: yD.id, ...yD.data(), classes: [] };
-        const cs = await db.collection('academicYears').doc(yD.id).collection('classes').orderBy('createdAt').get();
-        for (const cD of cs.docs) {
-          const cls = { id: cD.id, ...cD.data(), students: [], terms: [] };
+        const cs = classesPerYearSnaps[i];
+        year.classes = cs.docs.map(cD => {
+          const cls = { id: cD.id, ...cD.data(), students: [], terms: [], _yearId: yD.id };
           if (!cls.customCategories) cls.customCategories = [];
 
-          // ★ v8: Migrate classType on load (in-memory only)
-          // 'gradeRoster' → 'regular' (new meaning: base class without subject)
-          // Old 'regular' (with subject) → 'subject' (new: subject applied to a base class)
-          // Absent classType: infer from subject presence
+          // Migrate classType on load (in-memory only)
           if (!cls.classType) {
             cls.classType = cls.subject ? 'subject' : 'regular';
           } else if (cls.classType === 'gradeRoster') {
@@ -37,7 +69,6 @@ const CrudMethods = {
           } else if (cls.classType === 'regular' && cls.subject) {
             cls.classType = 'subject';
           }
-          // Base regular should have empty subject
           if (cls.classType === 'regular' && !cls.subject) cls.subject = '';
 
           if (!cls.scoreConfig) cls.scoreConfig = JSON.parse(JSON.stringify(DEFAULT_SCORE_CONFIG));
@@ -47,42 +78,93 @@ const CrudMethods = {
           if (!cls.scoreConfig.exam.a1Weights) cls.scoreConfig.exam.a1Weights = {};
           if (!cls.scoreConfig.exam.a1Weights.customCategories) cls.scoreConfig.exam.a1Weights.customCategories = {};
 
-          const ss = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('students').orderBy('studentNumber').get();
-          cls.students = ss.docs.map(d => ({ id: d.id, ...d.data() }));
-          const ts = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('terms').get();
-          for (const tD of ts.docs) {
-            const term = { id: tD.id, ...tD.data(), assessments: [] };
-            const as2 = await db.collection('academicYears').doc(yD.id).collection('classes').doc(cD.id).collection('terms').doc(tD.id).collection('assessments').orderBy('order').get();
-            term.assessments = as2.docs.map(d => {
-              const data = { id: d.id, ...d.data() };
-              if ((data.type === 'assignment' || data.type === 'quiz' || data.type === 'custom') && !data.scoreCategory) data.scoreCategory = 'none';
-              if (data.hasSubItems && !Array.isArray(data.subItems)) data.subItems = [];
-              if (data.hasSubItems && !data.subItemScores) data.subItemScores = {};
-              if (data.type === 'exam' && data.hasMultiplePapers && !Array.isArray(data.papers)) data.papers = [];
-              if (data.type === 'exam' && !data.paperScores) data.paperScores = {};
-              if (data.type === 'exam' && !data.adjustedScores) data.adjustedScores = {};
-              return data;
-            });
-            cls.terms.push(term);
-          }
-          year.classes.push(cls);
-        }
-        years.push(year);
+          return cls;
+        });
+        return year;
+      });
+
+      // Flatten list of all classes (for parallel student + term fetch)
+      const allClasses = [];
+      years.forEach(year => year.classes.forEach(cls => allClasses.push(cls)));
+
+      if (allClasses.length === 0) {
+        this.academicYears = years;
+        if (years.length > 0) this.expandedYears = { [years[0].id]: true };
+        this.loadingProgress = 100;
+        this.loading = false;
+        return;
       }
+
+      // Step 3: Load all students + all terms IN PARALLEL across all classes
+      this.loadingText = '正在載入學生及學期...';
+      const studentsPromises = allClasses.map(cls =>
+        db.collection('academicYears').doc(cls._yearId).collection('classes').doc(cls.id)
+          .collection('students').orderBy('studentNumber').get()
+      );
+      const termsPromises = allClasses.map(cls =>
+        db.collection('academicYears').doc(cls._yearId).collection('classes').doc(cls.id)
+          .collection('terms').get()
+      );
+      const [studentsSnaps, termsSnaps] = await Promise.all([
+        Promise.all(studentsPromises),
+        Promise.all(termsPromises)
+      ]);
+      this.loadingProgress = 65;
+
+      // Populate students + term shells
+      allClasses.forEach((cls, i) => {
+        cls.students = studentsSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }));
+        cls.terms = termsSnaps[i].docs.map(tD => ({
+          id: tD.id, ...tD.data(), assessments: [], _classId: cls.id, _yearId: cls._yearId
+        }));
+      });
+
+      // Step 4: Load all assessments for all terms IN PARALLEL
+      this.loadingText = '正在載入評估項目...';
+      const allTerms = [];
+      allClasses.forEach(cls => cls.terms.forEach(t => allTerms.push(t)));
+
+      if (allTerms.length > 0) {
+        const assessmentsPromises = allTerms.map(t =>
+          db.collection('academicYears').doc(t._yearId).collection('classes').doc(t._classId)
+            .collection('terms').doc(t.id).collection('assessments').orderBy('order').get()
+        );
+        const assessmentsSnaps = await Promise.all(assessmentsPromises);
+        this.loadingProgress = 90;
+
+        allTerms.forEach((t, i) => {
+          t.assessments = assessmentsSnaps[i].docs.map(d => {
+            const data = { id: d.id, ...d.data() };
+            if ((data.type === 'assignment' || data.type === 'quiz' || data.type === 'custom') && !data.scoreCategory) data.scoreCategory = 'none';
+            if (data.hasSubItems && !Array.isArray(data.subItems)) data.subItems = [];
+            if (data.hasSubItems && !data.subItemScores) data.subItemScores = {};
+            if (data.type === 'exam' && data.hasMultiplePapers && !Array.isArray(data.papers)) data.papers = [];
+            if (data.type === 'exam' && !data.paperScores) data.paperScores = {};
+            if (data.type === 'exam' && !data.adjustedScores) data.adjustedScores = {};
+            return data;
+          });
+          // Clean up tracking props
+          delete t._classId;
+          delete t._yearId;
+        });
+      }
+
+      // Clean up tracking props from classes
+      allClasses.forEach(cls => delete cls._yearId);
+
+      this.loadingText = '完成';
+      this.loadingProgress = 100;
       this.academicYears = years;
       if (years.length > 0) this.expandedYears = { [years[0].id]: true };
-      const gs = await db.collection('globalStudents').get();
-      this.globalStudents = gs.docs.map(d => ({ id: d.id, ...d.data() }));
-      this.loading = false;
+
+      // Small delay for user to perceive completion, then hide loader
+      setTimeout(() => { this.loading = false; }, 150);
     } catch (err) {
       console.error(err); this.error = err.message; this.loading = false;
       this.addToast('載入數據失敗:' + err.message, 'error');
     }
   },
 
-  // ★ v8: Get all linked classes (share students)
-  // Base 'regular' + all 'subject' with same className are linked.
-  // Electives are standalone.
   _getLinkedClasses(yearId, cls) {
     const year = this.academicYears.find(y => y.id === yearId);
     if (!year) return [cls];
@@ -113,9 +195,17 @@ const CrudMethods = {
 
   async deleteAcademicYear(yearId) {
     const year = this.academicYears.find(y => y.id === yearId); if (!year) return;
+    // ★ v9: Parallelize deletions
+    const deletionPromises = [];
     for (const cls of year.classes) {
-      for (const s of cls.students) await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('students').doc(s.id).delete();
-      for (const t of cls.terms || []) for (const a of t.assessments || []) await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete();
+      for (const s of cls.students) deletionPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('students').doc(s.id).delete());
+      for (const t of cls.terms || []) {
+        for (const a of t.assessments || []) deletionPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete());
+      }
+    }
+    await Promise.all(deletionPromises);
+    // Then delete terms + classes sequentially (they depend on subcollections)
+    for (const cls of year.classes) {
       for (const t of cls.terms || []) await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('terms').doc(t.id).delete();
       await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).delete();
     }
@@ -126,7 +216,6 @@ const CrudMethods = {
     this.addToast('學年已刪除', 'success');
   },
 
-  // ★ v8: addClass handles 'regular' (base class) and 'elective' (cross-class custom roster)
   async addClass() {
     const { className, classType, selectedStudentIds, subject } = this.modalData;
     if (!className.trim()) { this.addToast('請填寫班名', 'warning'); return; }
@@ -144,7 +233,6 @@ const CrudMethods = {
       if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
     }
 
-    // Check for duplicate base 'regular' class
     if (type === 'regular') {
       const existing = year.classes.find(c => c.className === className.trim() && c.classType === 'regular');
       if (existing) {
@@ -153,15 +241,12 @@ const CrudMethods = {
       }
     }
 
-    // Determine initial students
     let initialStudents = [];
     if (type === 'regular') {
-      // Auto-link with existing subject classes (same className)
       const siblings = year.classes.filter(c =>
         c.className === className.trim() && c.classType === 'subject');
       if (siblings.length > 0) {
         const seen = new Set();
-        // Use first sibling as source (all siblings share same students)
         const sib = siblings[0];
         for (const s of sib.students) {
           const gid = s.globalStudentId || s.id;
@@ -198,11 +283,12 @@ const CrudMethods = {
     });
     const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
 
-    // Base 'regular' has no terms (no grade entry)
     let terms = [];
     if (type !== 'regular') {
-      const t1 = await cr.collection('terms').add({ name: '上學期' });
-      const t2 = await cr.collection('terms').add({ name: '下學期' });
+      const [t1, t2] = await Promise.all([
+        cr.collection('terms').add({ name: '上學期' }),
+        cr.collection('terms').add({ name: '下學期' })
+      ]);
       terms = [{ id: t1.id, name: '上學期', assessments: [] }, { id: t2.id, name: '下學期', assessments: [] }];
     }
 
@@ -214,28 +300,33 @@ const CrudMethods = {
     };
     year.classes.push(nc);
 
-    // Add initial students
-    for (const s of initialStudents) {
-      const sdr = await cr.collection('students').add({
-        studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      nc.students.push({
-        id: sdr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId
-      });
-      if (s.globalStudentId) {
-        try {
-          await db.collection('globalStudents').doc(s.globalStudentId).update({
-            records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
-          });
-          const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
-          if (gs) {
-            if (!gs.records) gs.records = [];
-            if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
-              gs.records.push({ academicYearId: yearId, classId: dr.id });
+    // ★ v9: Parallelize student creation
+    if (initialStudents.length > 0) {
+      const studentPromises = initialStudents.map(s =>
+        cr.collection('students').add({
+          studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(sdr => ({ sdr, s }))
+      );
+      const results = await Promise.all(studentPromises);
+      for (const { sdr, s } of results) {
+        nc.students.push({
+          id: sdr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.globalStudentId
+        });
+        if (s.globalStudentId) {
+          try {
+            await db.collection('globalStudents').doc(s.globalStudentId).update({
+              records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
+            });
+            const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
+            if (gs) {
+              if (!gs.records) gs.records = [];
+              if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
+                gs.records.push({ academicYearId: yearId, classId: dr.id });
+              }
             }
-          }
-        } catch (e) { /* silent */ }
+          } catch (e) { /* silent */ }
+        }
       }
     }
 
@@ -249,7 +340,6 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
-  // ★ v8: addSubject - new method to add a subject to multiple base classes
   async addSubject() {
     let subjectName = (this.modalData.subject || '').trim();
     if (subjectName === '__new__') subjectName = '';
@@ -262,7 +352,6 @@ const CrudMethods = {
     const year = this.academicYears.find(y => y.id === yearId);
     if (!year) { this.addToast('找不到學年', 'error'); return; }
 
-    // Pre-check for duplicates
     const conflicts = [];
     for (const classId of selectedClassIds) {
       const baseClass = year.classes.find(c => c.id === classId);
@@ -276,7 +365,6 @@ const CrudMethods = {
       return;
     }
 
-    // Create subject-class entity for each selected base class
     let createdCount = 0;
     let totalStudents = 0;
     for (const classId of selectedClassIds) {
@@ -294,8 +382,11 @@ const CrudMethods = {
       });
       const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
 
-      const t1 = await cr.collection('terms').add({ name: '上學期' });
-      const t2 = await cr.collection('terms').add({ name: '下學期' });
+      // ★ v9: Parallelize term + students
+      const [t1, t2] = await Promise.all([
+        cr.collection('terms').add({ name: '上學期' }),
+        cr.collection('terms').add({ name: '下學期' })
+      ]);
 
       const nc = {
         id: dr.id,
@@ -313,35 +404,40 @@ const CrudMethods = {
       };
       year.classes.push(nc);
 
-      // Sync students from base class
-      for (const s of baseClass.students) {
-        const sdr = await cr.collection('students').add({
-          studentNumber: s.studentNumber,
-          studentName: s.studentName,
-          globalStudentId: s.globalStudentId || null,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        nc.students.push({
-          id: sdr.id,
-          studentNumber: s.studentNumber,
-          studentName: s.studentName,
-          globalStudentId: s.globalStudentId || null
-        });
-        if (s.globalStudentId) {
-          try {
-            await db.collection('globalStudents').doc(s.globalStudentId).update({
-              records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
-            });
-            const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
-            if (gs) {
-              if (!gs.records) gs.records = [];
-              if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
-                gs.records.push({ academicYearId: yearId, classId: dr.id });
+      // Parallelize student additions
+      if (baseClass.students.length > 0) {
+        const studentPromises = baseClass.students.map(s =>
+          cr.collection('students').add({
+            studentNumber: s.studentNumber,
+            studentName: s.studentName,
+            globalStudentId: s.globalStudentId || null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(sdr => ({ sdr, s }))
+        );
+        const results = await Promise.all(studentPromises);
+        for (const { sdr, s } of results) {
+          nc.students.push({
+            id: sdr.id,
+            studentNumber: s.studentNumber,
+            studentName: s.studentName,
+            globalStudentId: s.globalStudentId || null
+          });
+          if (s.globalStudentId) {
+            try {
+              await db.collection('globalStudents').doc(s.globalStudentId).update({
+                records: firebase.firestore.FieldValue.arrayUnion({ academicYearId: yearId, classId: dr.id })
+              });
+              const gs = this.globalStudents.find(g => g.id === s.globalStudentId);
+              if (gs) {
+                if (!gs.records) gs.records = [];
+                if (!gs.records.find(r => r.academicYearId === yearId && r.classId === dr.id)) {
+                  gs.records.push({ academicYearId: yearId, classId: dr.id });
+                }
               }
-            }
-          } catch (e) { /* silent */ }
+            } catch (e) { /* silent */ }
+          }
+          totalStudents++;
         }
-        totalStudents++;
       }
       createdCount++;
     }
@@ -350,7 +446,6 @@ const CrudMethods = {
     this.addToast('已新增科目「' + subjectName + '」至 ' + createdCount + ' 個班別(共同步 ' + totalStudents + ' 位學生)', 'success');
   },
 
-  // ★ v8: updateClass - handles all three classTypes appropriately
   async updateClass() {
     const { id, className, subject, classType } = this.modalData;
     const type = classType || 'regular';
@@ -366,27 +461,23 @@ const CrudMethods = {
     if (!origCls) return;
 
     if (type === 'regular') {
-      // Base class: allow className change (cascades to linked subject classes)
       const newName = className.trim();
       const oldName = origCls.className;
       if (newName !== oldName) {
-        // Check conflict
         if (year.classes.find(c => c.id !== id && c.className === newName && c.classType === 'regular')) {
           this.addToast('此學年已有另一個一般班別「' + newName + '」', 'warning');
           return;
         }
-        // Update this class + all linked subject classes
         const linked = year.classes.filter(c => c.className === oldName && (c.classType === 'regular' || c.classType === 'subject'));
-        for (const c of linked) {
-          await db.collection('academicYears').doc(yearId).collection('classes').doc(c.id).update({ className: newName });
-          c.className = newName;
-        }
+        // ★ v9: Parallelize updates
+        await Promise.all(linked.map(c =>
+          db.collection('academicYears').doc(yearId).collection('classes').doc(c.id).update({ className: newName })
+        ));
+        linked.forEach(c => { c.className = newName; });
       } else {
-        // Just touch to persist classType if needed (silent migration)
         await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({ classType: 'regular' });
       }
     } else if (type === 'subject') {
-      // Subject class: only allow subject change (className readonly)
       if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
       const conflict = year.classes.find(c =>
         c.id !== id && c.classType === 'subject' && c.className === origCls.className && c.subject === subjectName);
@@ -397,7 +488,6 @@ const CrudMethods = {
       await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({ subject: subjectName, classType: 'subject' });
       origCls.subject = subjectName;
     } else if (type === 'elective') {
-      // Elective: both className and subject editable
       if (!subjectName) { this.addToast('請選擇或輸入科目', 'warning'); return; }
       await db.collection('academicYears').doc(yearId).collection('classes').doc(id).update({
         className: className.trim(),
@@ -407,7 +497,6 @@ const CrudMethods = {
       origCls.subject = subjectName;
     }
 
-    // Update settingsNav breadcrumb labels
     this.settingsNav.forEach(n => {
       if (n.classId === id) {
         n.label = origCls.className + (origCls.subject ? ' - ' + origCls.subject : '');
@@ -419,7 +508,6 @@ const CrudMethods = {
     this.addToast('已更新', 'success');
   },
 
-  // ★ v8: deleteClass - cascades for base 'regular' (deletes linked subjects)
   async deleteClass(yearId, classId) {
     const year = this.academicYears.find(y => y.id === yearId);
     const cls = year?.classes.find(c => c.id === classId);
@@ -427,26 +515,38 @@ const CrudMethods = {
 
     const targets = [cls];
     if (cls.classType === 'regular') {
-      // Cascade: delete all linked subject classes too
       const linked = year.classes.filter(c =>
         c.id !== cls.id && c.className === cls.className && c.classType === 'subject');
       targets.push(...linked);
     }
 
+    // ★ v9: Parallelize deep deletions
+    const studentDeletions = [];
+    const assessmentDeletions = [];
     for (const t of targets) {
       for (const s of t.students) {
-        await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(s.id).delete();
+        studentDeletions.push(db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(s.id).delete());
       }
       for (const term of t.terms || []) {
         for (const a of term.assessments || []) {
-          await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).collection('assessments').doc(a.id).delete();
+          assessmentDeletions.push(db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).collection('assessments').doc(a.id).delete());
         }
-        await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).delete();
       }
-      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).delete();
     }
+    await Promise.all([...studentDeletions, ...assessmentDeletions]);
 
-    // Update local state
+    // Then delete terms
+    const termDeletions = [];
+    for (const t of targets) {
+      for (const term of t.terms || []) {
+        termDeletions.push(db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('terms').doc(term.id).delete());
+      }
+    }
+    await Promise.all(termDeletions);
+
+    // Finally delete classes
+    await Promise.all(targets.map(t => db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).delete()));
+
     const deletedIds = targets.map(t => t.id);
     year.classes = year.classes.filter(c => !deletedIds.includes(c.id));
 
@@ -462,7 +562,6 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
-  // ★ v8: addStudent syncs to all linked classes (base regular + subjects)
   async addStudent() {
     const { studentNumber, studentName, linkToGlobal, matchedGlobal } = this.modalData;
     if (!studentNumber.trim() || !studentName.trim()) { this.addToast('請填寫學號和姓名', 'warning'); return; }
@@ -472,7 +571,6 @@ const CrudMethods = {
 
     const targets = this._getLinkedClasses(yearId, cls);
 
-    // Check duplicates in all targets
     for (const t of targets) {
       if (t.students.find(s => s.studentNumber === studentNumber.trim())) {
         const typeLabel = t.classType === 'regular' ? '(一般班別)' : t.subject ? '(' + t.subject + ')' : '';
@@ -495,11 +593,15 @@ const CrudMethods = {
       this.globalStudents.push({ id: gr.id, name: studentName.trim(), records: [...recordsToAdd] });
     }
 
-    for (const t of targets) {
-      const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
+    // ★ v9: Parallelize per-target student creation
+    const addPromises = targets.map(t =>
+      db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
         studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      }).then(dr => ({ dr, t }))
+    );
+    const results = await Promise.all(addPromises);
+    for (const { dr, t } of results) {
       t.students.push({ id: dr.id, studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid });
     }
 
@@ -510,7 +612,6 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
-  // ★ v8: updateStudent syncs to all linked classes
   async updateStudent() {
     const { id, studentNumber, studentName } = this.modalData;
     if (!studentNumber.trim() || !studentName.trim()) { this.addToast('請填寫學號和姓名', 'warning'); return; }
@@ -533,16 +634,25 @@ const CrudMethods = {
       }
     }
 
+    // ★ v9: Parallelize target updates
+    const updatePromises = [];
+    const localUpdates = [];
     for (const t of targets) {
       let stuInTarget;
       if (t.id === classId) stuInTarget = origStu;
       else stuInTarget = gid ? t.students.find(s => s.globalStudentId === gid) : null;
       if (!stuInTarget) continue;
-      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).update({
-        studentNumber: studentNumber.trim(), studentName: studentName.trim()
-      });
-      stuInTarget.studentNumber = studentNumber.trim();
-      stuInTarget.studentName = studentName.trim();
+      updatePromises.push(
+        db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).update({
+          studentNumber: studentNumber.trim(), studentName: studentName.trim()
+        })
+      );
+      localUpdates.push(stuInTarget);
+    }
+    await Promise.all(updatePromises);
+    for (const s of localUpdates) {
+      s.studentNumber = studentNumber.trim();
+      s.studentName = studentName.trim();
     }
 
     if (gid) {
@@ -560,7 +670,6 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
-  // ★ v8: deleteStudent syncs to all linked classes
   async deleteStudent(yearId, classId, studentId) {
     const cls = this.getClassObj(yearId, classId);
     if (!cls) return;
@@ -569,20 +678,26 @@ const CrudMethods = {
     const gid = stu.globalStudentId;
     const targets = this._getLinkedClasses(yearId, cls);
     let count = 0;
+    // ★ v9: Parallelize deletions
+    const delPromises = [];
+    const localRemovals = [];
     for (const t of targets) {
       let stuInTarget;
       if (t.id === classId) stuInTarget = stu;
       else stuInTarget = gid ? t.students.find(s => s.globalStudentId === gid) : null;
       if (!stuInTarget) continue;
-      await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).delete();
-      t.students = t.students.filter(s => s.id !== stuInTarget.id);
+      delPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').doc(stuInTarget.id).delete());
+      localRemovals.push({ t, sid: stuInTarget.id });
       count++;
+    }
+    await Promise.all(delPromises);
+    for (const { t, sid } of localRemovals) {
+      t.students = t.students.filter(s => s.id !== sid);
     }
     const msg = count > 1 ? '學生已從 ' + count + ' 個連結班別中刪除' : '學生已刪除';
     this.addToast(msg, 'success');
   },
 
-  // ★ v8: batchImportStudents syncs to all linked classes
   async batchImportStudents() {
     const text = this.modalData.text || '';
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
@@ -613,15 +728,29 @@ const CrudMethods = {
     }
 
     const recordsForAll = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
+    // ★ v9: Parallelize all student creation
+    const allPromises = [];
+    const globalStudentResults = [];
     for (const s of students) {
-      const gr = await db.collection('globalStudents').add({ name: s.studentName, records: recordsForAll });
-      this.globalStudents.push({ id: gr.id, name: s.studentName, records: [...recordsForAll] });
-      for (const t of targets) {
-        const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
-          studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      const p = db.collection('globalStudents').add({ name: s.studentName, records: recordsForAll })
+        .then(gr => {
+          globalStudentResults.push({ gr, s });
+          return Promise.all(targets.map(t =>
+            db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
+              studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(dr => ({ dr, t, s, gid: gr.id }))
+          ));
         });
-        t.students.push({ id: dr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id });
+      allPromises.push(p);
+    }
+    const allResults = await Promise.all(allPromises);
+    for (const { gr, s } of globalStudentResults) {
+      this.globalStudents.push({ id: gr.id, name: s.studentName, records: [...recordsForAll] });
+    }
+    for (const resultArr of allResults) {
+      for (const { dr, t, s, gid } of resultArr) {
+        t.students.push({ id: dr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gid });
       }
     }
 
@@ -913,6 +1042,15 @@ const CrudMethods = {
       customCategories: cls.customCategories,
       scoreConfig: cls.scoreConfig
     });
+    // ★ v13: Sync local scoringWeightsLocal so UI reflects new category immediately
+    if (this.currentAcademicYearId === yearId && this.currentClassId === classId) {
+      this._scoringSkipWatch = true;
+      if (!this.scoringWeightsLocal.ut.customCategories) this.scoringWeightsLocal.ut.customCategories = {};
+      if (!this.scoringWeightsLocal.exam.a1Weights.customCategories) this.scoringWeightsLocal.exam.a1Weights.customCategories = {};
+      this.scoringWeightsLocal.ut.customCategories[catId] = 0;
+      this.scoringWeightsLocal.exam.a1Weights.customCategories[catId] = 0;
+      this.$nextTick(() => { this._scoringSkipWatch = false; });
+    }
     this.closeModal();
     this.addToast('已新增類別「' + name.trim() + '」', 'success');
   },
@@ -923,17 +1061,27 @@ const CrudMethods = {
     cls.customCategories = (cls.customCategories || []).filter(c => c.id !== categoryId);
     if (cls.scoreConfig?.ut?.customCategories) delete cls.scoreConfig.ut.customCategories[categoryId];
     if (cls.scoreConfig?.exam?.a1Weights?.customCategories) delete cls.scoreConfig.exam.a1Weights.customCategories[categoryId];
+    // ★ v9: Parallelize assessment deletions
+    const delPromises = [];
     for (const t of cls.terms || []) {
       const toDelete = (t.assessments || []).filter(a => a.type === 'custom' && a.customCategoryId === categoryId);
       for (const a of toDelete) {
-        await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete();
+        delPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(t.id).collection('assessments').doc(a.id).delete());
       }
       t.assessments = (t.assessments || []).filter(a => !(a.type === 'custom' && a.customCategoryId === categoryId));
     }
+    await Promise.all(delPromises);
     await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).update({
       customCategories: cls.customCategories,
       scoreConfig: cls.scoreConfig
     });
+    // ★ v13: Sync local scoringWeightsLocal
+    if (this.currentAcademicYearId === yearId && this.currentClassId === classId) {
+      this._scoringSkipWatch = true;
+      if (this.scoringWeightsLocal.ut.customCategories) delete this.scoringWeightsLocal.ut.customCategories[categoryId];
+      if (this.scoringWeightsLocal.exam.a1Weights.customCategories) delete this.scoringWeightsLocal.exam.a1Weights.customCategories[categoryId];
+      this.$nextTick(() => { this._scoringSkipWatch = false; });
+    }
     this.addToast('已刪除類別', 'success');
   },
 
