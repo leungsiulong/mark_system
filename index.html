@@ -27,15 +27,16 @@
     .grades-table th,.grades-table td{border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;box-sizing:border-box}
     .grades-table thead tr:first-child th{border-top:1px solid #e5e7eb}
     .grades-table td:first-child,.grades-table th:first-child{border-left:1px solid #e5e7eb}
-    .grades-table thead{position:sticky;top:0;z-index:20}
-    .grades-table .frozen-sn{position:sticky;left:0;z-index:10;min-width:48px;width:48px;max-width:60px;white-space:nowrap;background:#fff}
-    .grades-table .frozen-name{position:sticky;left:48px;z-index:10;white-space:nowrap;background:#fff;min-width:56px;max-width:120px;padding-left:6px;padding-right:6px}
-    .grades-table thead .frozen-sn,.grades-table thead .frozen-name{z-index:30;background:#f9fafb}
-    .grades-table .stats-frozen-sn{position:sticky;left:0;z-index:6;background:#f9fafb}
-    .grades-table .stats-frozen-name{position:sticky;left:48px;z-index:6;background:#f9fafb}
-    .grades-table .frozen-class{position:sticky;left:0;z-index:10;min-width:48px;width:56px;max-width:80px;white-space:nowrap;background:#fff;text-align:center}
-    .grades-table thead .frozen-class{z-index:30;background:#f9fafb}
-    .grades-table .stats-frozen-class{position:sticky;left:0;z-index:6;background:#f9fafb}
+    /* ★ v14: Lower thead z-index (was 20) so left sidebar (z-40) wins on mobile */
+    .grades-table thead{position:sticky;top:0;z-index:5}
+    .grades-table .frozen-sn{position:sticky;left:0;z-index:3;min-width:48px;width:48px;max-width:60px;white-space:nowrap;background:#fff}
+    .grades-table .frozen-name{position:sticky;left:48px;z-index:3;white-space:nowrap;background:#fff;min-width:56px;max-width:120px;padding-left:6px;padding-right:6px}
+    .grades-table thead .frozen-sn,.grades-table thead .frozen-name{z-index:6;background:#f9fafb}
+    .grades-table .stats-frozen-sn{position:sticky;left:0;z-index:2;background:#f9fafb}
+    .grades-table .stats-frozen-name{position:sticky;left:48px;z-index:2;background:#f9fafb}
+    .grades-table .frozen-class{position:sticky;left:0;z-index:3;min-width:48px;width:56px;max-width:80px;white-space:nowrap;background:#fff;text-align:center}
+    .grades-table thead .frozen-class{z-index:6;background:#f9fafb}
+    .grades-table .stats-frozen-class{position:sticky;left:0;z-index:2;background:#f9fafb}
     .grades-table.has-class-col .frozen-sn{left:56px}
     .grades-table.has-class-col .frozen-name{left:104px}
     .grades-table.has-class-col .stats-frozen-sn{left:56px}
@@ -104,12 +105,23 @@
     .custom-cat-select-btn{flex:1;text-align:left;padding:8px 12px;font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer;border:none;background:transparent}
     .custom-cat-delete-btn{padding:8px 10px;color:#9ca3af;border:none;border-left:1px solid #e5e7eb;background:transparent;cursor:pointer;transition:all .15s}
     .custom-cat-delete-btn:hover{color:#ef4444;background-color:#fef2f2}
+
+    /* ★ v14: Name template chips */
+    .name-tpl-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:9999px;background:#eff6ff;color:#1d4ed8;font-size:12px;border:1px solid #bfdbfe;cursor:pointer;transition:all .15s;user-select:none;margin:2px}
+    .name-tpl-chip:hover{background:#dbeafe;border-color:#93c5fd;transform:translateY(-1px)}
+    .name-tpl-chip:active{transform:translateY(0)}
+
     @media (max-width: 640px) {
       .cal-day{min-height:56px;padding:2px!important}
       .cal-week-day{min-height:160px}
       .grades-table .frozen-name{max-width:80px}
       .seg-track{min-width:130px;height:26px}
       .seg-option{font-size:10px}
+    }
+    /* ★ v14: Ensure on mobile sidebar overlays everything (including grades sticky header) */
+    @media (max-width: 1023px) {
+      .mobile-sidebar { z-index: 40 !important; }
+      .mobile-overlay { z-index: 35 !important; }
     }
     .sidebar-slide-enter-active,.sidebar-slide-leave-active{transition:transform .25s ease}
     .sidebar-slide-enter-from,.sidebar-slide-leave-to{transform:translateX(-100%)}
@@ -445,12 +457,23 @@
         </template>
 
         <template v-if="modalType==='addAssessment'||modalType==='editAssessment'">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">名稱</label><input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">滿分</label><input v-model="modalData.fullMark" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">名稱</label>
+            <input v-model="modalData.name" name="assessmentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+            <!-- ★ v14: Name template chips -->
+            <div v-if="nameTemplates && nameTemplates.length > 0" class="mt-2 flex flex-wrap items-center gap-0.5">
+              <span class="text-xs text-gray-500 mr-1">快速插入：</span>
+              <button v-for="(tpl, ti) in nameTemplates" :key="ti" type="button"
+                class="name-tpl-chip" @click="insertNameTemplate(tpl)" :title="'插入「'+tpl+'」'">
+                <i class="fas fa-plus text-xs mr-1 opacity-60"></i>{{tpl}}
+              </button>
+            </div>
+          </div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">滿分（Set 1 / 正常卷）</label><input v-model="modalData.fullMark" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">日期</label><input v-model="modalData.date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">備注</label><textarea v-model="modalData.notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="選填（Shift+Enter 換行）"></textarea></div>
 
-          <template v-if="(modalType==='addAssessment' || modalType==='editAssessment') && modalData.type==='quiz'">
+          <template v-if="modalData.type==='quiz'">
             <div class="bg-pink-50 border border-pink-200 rounded-lg p-3">
               <div class="flex items-start gap-2">
                 <i class="fas fa-plus-circle text-pink-500 mt-0.5"></i>
@@ -462,7 +485,7 @@
             </div>
           </template>
 
-          <template v-if="(modalType==='addAssessment' || modalType==='editAssessment') && modalData.type!=='class_performance' && modalData.type!=='unified_test' && !(modalData.type==='exam' && (modalData.hasAdjustedPaper || modalData.hasMultiplePapers))">
+          <template v-if="modalData.type!=='class_performance' && modalData.type!=='unified_test' && !(modalData.type==='exam' && (modalData.hasAdjustedPaper || modalData.hasMultiplePapers))">
             <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
               <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasSubItems" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-indigo-800">分為小項目計分</div><div class="text-xs text-indigo-700 mt-0.5">可新增多個小項目，總分為小項目加總（封頂於評估滿分）。</div></div></label>
               <div v-if="modalData.hasSubItems" class="mt-3 space-y-2">
@@ -482,27 +505,40 @@
             </div>
           </template>
 
-          <template v-if="(modalType==='addAssessment' || modalType==='editAssessment') && modalData.type==='exam'">
+          <template v-if="modalData.type==='exam'">
             <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-              <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasAdjustedPaper" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-red-800">有調適卷 (Set 1 / Set 2)</div><div class="text-xs text-red-700 mt-0.5">Set 1 為正常卷；Set 2 得分 × 乘數，並封頂於合格分數。</div></div></label>
-              <div v-if="modalData.hasAdjustedPaper" class="mt-3 grid grid-cols-2 gap-2">
-                <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label><input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
-                <div><label class="text-xs text-gray-600">Set 2 封頂分</label><input v-model.number="modalData.passingScore" type="number" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
+              <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasAdjustedPaper" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-red-800">有調適卷 (Set 1 / Set 2)</div><div class="text-xs text-red-700 mt-0.5">Set 1 為正常卷；Set 2 可有不同總分，得分按比例換算後 × 乘數，並封頂於合格分數。</div></div></label>
+              <div v-if="modalData.hasAdjustedPaper" class="mt-3 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label><input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
+                  <div><label class="text-xs text-gray-600">Set 2 封頂分</label><input v-model.number="modalData.passingScore" type="number" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
+                </div>
+                <!-- ★ v14: Set 2 independent fullMark (only when not multi-paper) -->
+                <div v-if="!modalData.hasMultiplePapers">
+                  <label class="text-xs text-gray-600">Set 2 滿分（留空 = 與 Set 1 相同）</label>
+                  <input v-model="modalData.fullMarkS2" type="number" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  <p class="text-xs text-red-500 mt-1">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    例：Set 1 滿分 100、Set 2 滿分 80 ⇒ 學生 Set 2 得 60 分 ≈ Set 1 的 75 分，再 × 乘數及封頂。
+                  </p>
+                </div>
               </div>
             </div>
             <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasMultiplePapers" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-orange-800">多份分卷</div><div class="text-xs text-orange-700 mt-0.5">將考試分為多份分卷，每份可設置權重。</div></div></label>
+              <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasMultiplePapers" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-orange-800">多份分卷</div><div class="text-xs text-orange-700 mt-0.5">將考試分為多份分卷，每份可設置權重；若同時啟用「調適卷」每份分卷可分別設 Set 2 滿分。</div></div></label>
               <div v-if="modalData.hasMultiplePapers" class="mt-3 space-y-2">
                 <div class="flex items-center gap-1 px-1 pb-1 text-xs font-semibold text-gray-600 border-b border-orange-200">
                   <span class="flex-1">分卷名稱</span>
-                  <span class="w-16 text-center">滿分</span>
-                  <span class="w-16 text-center">權重%</span>
+                  <span class="w-14 text-center">S1滿</span>
+                  <span v-if="modalData.hasAdjustedPaper" class="w-14 text-center">S2滿</span>
+                  <span class="w-14 text-center">權重%</span>
                   <span class="w-6"></span>
                 </div>
                 <div v-for="(p, idx) in modalData.papers" :key="idx" class="flex items-center gap-1">
                   <input v-model="p.name" placeholder="分卷名稱" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="滿分" class="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重%" class="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" min="1" placeholder="預設=S1" :title="'Set 2 滿分（留空 = 與 S1 相同）'" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemovePaper(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddPaper()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50"><i class="fas fa-plus mr-1"></i>新增分卷</button>
@@ -594,11 +630,19 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">名稱（留空自動命名）</label>
-            <input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：課業1">
+            <input v-model="modalData.name" name="assessmentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：課業1">
+            <!-- ★ v14: Name template chips for calendar modal too -->
+            <div v-if="nameTemplates && nameTemplates.length > 0" class="mt-2 flex flex-wrap items-center gap-0.5">
+              <span class="text-xs text-gray-500 mr-1">快速插入：</span>
+              <button v-for="(tpl, ti) in nameTemplates" :key="ti" type="button"
+                class="name-tpl-chip" @click="insertNameTemplate(tpl)">
+                <i class="fas fa-plus text-xs mr-1 opacity-60"></i>{{tpl}}
+              </button>
+            </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">滿分</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">滿分（Set 1 / 正常卷）</label>
             <input v-model="modalData.fullMark" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
           </div>
 
@@ -658,15 +702,21 @@
                 <input type="checkbox" v-model="modalData.hasAdjustedPaper" class="mt-0.5 rounded border-gray-300">
                 <div>
                   <div class="text-sm font-medium text-red-800">有調適卷 (Set 1 / Set 2)</div>
-                  <div class="text-xs text-red-700 mt-0.5">Set 1 為正常卷；Set 2 得分 × 乘數，並封頂於合格分數。</div>
+                  <div class="text-xs text-red-700 mt-0.5">Set 1 為正常卷；Set 2 可有不同總分，得分按比例換算後 × 乘數，並封頂於合格分數。</div>
                 </div>
               </label>
-              <div v-if="modalData.hasAdjustedPaper" class="mt-3 grid grid-cols-2 gap-2">
-                <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label>
-                  <input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+              <div v-if="modalData.hasAdjustedPaper" class="mt-3 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label>
+                    <input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  </div>
+                  <div><label class="text-xs text-gray-600">Set 2 封頂分</label>
+                    <input v-model.number="modalData.passingScore" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  </div>
                 </div>
-                <div><label class="text-xs text-gray-600">Set 2 封頂分</label>
-                  <input v-model.number="modalData.passingScore" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                <div v-if="!modalData.hasMultiplePapers">
+                  <label class="text-xs text-gray-600">Set 2 滿分（留空 = 與 Set 1 相同）</label>
+                  <input v-model="modalData.fullMarkS2" type="number" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                 </div>
               </div>
             </div>
@@ -681,14 +731,16 @@
               <div v-if="modalData.hasMultiplePapers" class="mt-3 space-y-2">
                 <div class="flex items-center gap-1 px-1 pb-1 text-xs font-semibold text-gray-600 border-b border-orange-200">
                   <span class="flex-1">分卷名稱</span>
-                  <span class="w-16 text-center">滿分</span>
-                  <span class="w-16 text-center">權重%</span>
+                  <span class="w-14 text-center">S1滿</span>
+                  <span v-if="modalData.hasAdjustedPaper" class="w-14 text-center">S2滿</span>
+                  <span class="w-14 text-center">權重%</span>
                   <span class="w-6"></span>
                 </div>
                 <div v-for="(p, idx) in modalData.papers" :key="idx" class="flex items-center gap-1">
                   <input v-model="p.name" placeholder="分卷名稱" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="滿分" class="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重%" class="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" min="1" placeholder="預設=S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemovePaper(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddPaper()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50">
@@ -737,10 +789,10 @@
     </nav>
     <div class="flex flex-1 min-h-0 relative">
       <transition name="overlay-fade">
-        <div v-if="leftPanelOpen && currentView !== 'home' && currentView !== 'settings'" @click="leftPanelOpen=false" @touchmove.prevent class="absolute inset-0 bg-black/30 z-10 lg:hidden"></div>
+        <div v-if="leftPanelOpen && currentView !== 'home' && currentView !== 'settings'" @click="leftPanelOpen=false" @touchmove.prevent class="absolute inset-0 bg-black/30 z-10 lg:hidden mobile-overlay"></div>
       </transition>
       <transition name="sidebar-slide">
-        <aside v-if="isLeftPanelVisible" class="w-56 bg-white border-r flex flex-col shrink-0 overflow-y-auto absolute inset-y-0 left-0 z-20 shadow-xl lg:static lg:shadow-none lg:z-10">
+        <aside v-if="isLeftPanelVisible" class="w-56 bg-white border-r flex flex-col shrink-0 overflow-y-auto absolute inset-y-0 left-0 z-20 shadow-xl lg:static lg:shadow-none lg:z-10 mobile-sidebar">
           <div class="px-3 py-2 border-b bg-gray-50"><span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">學年班別</span></div>
           <div class="flex-1 overflow-y-auto p-1.5">
             <div v-for="y in academicYears" :key="y.id" class="mb-1">
@@ -988,7 +1040,7 @@
             </div>
             <div v-if="gradesOrderedAssessments.length===0" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p class="font-medium">尚未新增評估項目</p><p class="text-sm mt-1">請使用上方按鈕新增課業、小測或考試</p></div></div>
 
-            <div v-else class="flex-1 min-h-0 grades-scroll-container" ref="gradesWrapper" tabindex="-1" @keydown="gradesHandleKeydown" @copy="gradesHandleCopy" @paste="gradesHandlePaste" @click.self="gradesDeselect">
+            <div v-else class="flex-1 min-h-0 grades-scroll-container" :class="{'is-dragging': gradesIsDragging}" ref="gradesWrapper" tabindex="-1" @keydown="gradesHandleKeydown" @copy="gradesHandleCopy" @paste="gradesHandlePaste" @click.self="gradesDeselect">
               <table class="grades-table" :class="{'has-class-col': isCurrentClassElective}">
                 <thead>
                   <tr>
@@ -1011,18 +1063,26 @@
                     </th>
                   </tr>
                   <tr>
-                    <th v-for="(h, hi) in gradesRow3Headers" :key="'r3'+hi" :colspan="h.colspan" :rowspan="h.rowspan" :style="gradesAssessmentHeaderStyle(h.startCol)" class="text-center text-xs px-1 sm:px-2 py-0.5 opacity-80 font-normal">{{h.label}}</th>
+                    <th v-for="(h, hi) in gradesRow3Headers" :key="'r3'+hi" :colspan="h.colspan" :rowspan="h.rowspan" :style="gradesAssessmentHeaderStyle(h.startCol)" class="text-center text-xs px-1 sm:px-2 py-0.5 opacity-80 font-normal cursor-pointer hover:opacity-100"
+                        @click.stop="gradesShowAssessmentDetail(h.startCol,$event)">{{h.label}}</th>
                   </tr>
                   <tr v-if="gradesNeedsRow4">
-                    <th v-for="(r4, r4i) in gradesRow4Cells" :key="'r4'+r4i" :style="gradesAssessmentHeaderStyle(r4.colSpec.colIdx)" class="text-center text-xs px-1 py-0.5 opacity-70 font-normal">{{r4.label}}</th>
+                    <th v-for="(r4, r4i) in gradesRow4Cells" :key="'r4'+r4i" :style="gradesAssessmentHeaderStyle(r4.colSpec.colIdx)" class="text-center text-xs px-1 py-0.5 opacity-70 font-normal cursor-pointer hover:opacity-100"
+                        @click.stop="gradesShowAssessmentDetail(r4.colSpec.colIdx,$event)">{{r4.label}}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(s,ri) in gradesSortedStudents" :key="s.id" class="hover:bg-gray-50/50">
+                  <tr v-for="(s,ri) in gradesSortedStudents" :key="s.id" class="hover:bg-gray-50/50" :class="{'row-hover-highlight': gradesHoverRow === ri || gradesFocusRow === ri}">
                     <td v-if="isCurrentClassElective" class="frozen-class text-center text-xs px-1 py-0.5 text-gray-600 bg-white">{{getStudentOriginClass(s)}}</td>
                     <td class="frozen-sn text-center text-sm px-1 py-0.5 text-gray-700 bg-white">{{s.studentNumber}}</td>
                     <td class="frozen-name text-sm px-1 py-0.5 text-gray-800 bg-white truncate">{{s.studentName}}</td>
-                    <td v-for="(col,ci) in gradesOrderedColumns" :key="col.colKey+s.id" :class="gradesCellClass(ri,ci,s.id)" :data-acol="ci" @click="col.readOnly?null:gradesFocusCell(ri,ci)" @mouseenter="gradesOnCellMouseEnter($event,ri,ci)" @mouseleave="gradesOnCellMouseLeave()" class="text-center text-sm px-1 py-0.5">
+                    <td v-for="(col,ci) in gradesOrderedColumns" :key="col.colKey+s.id"
+                        :class="gradesCellClass(ri,ci,s.id)"
+                        :data-acol="ci"
+                        @mousedown="gradesOnCellMouseDown(ri, ci, $event)"
+                        @mouseenter="gradesOnCellMouseEnter($event,ri,ci)"
+                        @mouseleave="gradesOnCellMouseLeave()"
+                        class="text-center text-sm px-1 py-0.5">
                       <template v-if="gradesFocusRow===ri&&gradesFocusCol===ci&&!col.readOnly"><input ref="gradesEditInput" v-model="gradesEditValue" @blur="gradesOnCellBlur" class="grades-inline-input"></template>
                       <template v-else>{{gradesGetDisplayScore(s.id,ci)}}</template>
                     </td>
@@ -1042,10 +1102,34 @@
                 <button @click="gradesCloseDetailPanel" class="p-1 rounded hover:bg-black/10 text-lg leading-none">&times;</button>
               </div>
               <div class="px-4 py-3 space-y-2 text-sm">
+                <!-- ★ v14: Inline Set 1/2 fullMark editor -->
+                <div v-if="gradesDetailPanelColInfo" class="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 mb-2">
+                  <div class="text-xs font-semibold text-yellow-800 mb-1.5">
+                    <i class="fas fa-edit mr-1"></i>修改{{gradesDetailPanelColInfo.setLabel}}總分
+                    <span v-if="gradesDetailPanelColInfo.paperName" class="text-gray-500 font-normal">（分卷：{{gradesDetailPanelColInfo.paperName}}）</span>
+                  </div>
+                  <div class="flex gap-2 items-center">
+                    <input v-model="gradesDetailEditFullMark" type="number" min="1" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-yellow-400">
+                    <button @click="gradesSaveSetFullMark" class="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 transition whitespace-nowrap">
+                      <i class="fas fa-save mr-0.5"></i>儲存
+                    </button>
+                  </div>
+                  <div class="text-xs text-yellow-700 mt-1.5">
+                    <i class="fas fa-info-circle mr-1"></i>儲存後會根據新總分重新計算所有學生的調適後分數
+                  </div>
+                </div>
+
                 <div class="flex justify-between"><span class="text-gray-500">滿分</span><span class="font-semibold">{{gradesDetailAssessment.fullMark}}</span></div>
+                <div v-if="gradesDetailAssessment.fullMarkS2 != null" class="flex justify-between"><span class="text-gray-500">Set 2 滿分</span><span class="font-semibold">{{gradesDetailAssessment.fullMarkS2}}</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">日期</span><span class="font-medium">{{gradesDetailAssessment.date?gradesFormatDate(gradesDetailAssessment.date):'未設定'}}</span></div>
                 <div v-if="gradesDetailAssessment.hasSubItems" class="pt-2 border-t"><div class="text-gray-500 text-xs mb-1">小項目</div><div v-for="si in gradesDetailAssessment.subItems" :key="si.id" class="text-xs text-gray-700 flex justify-between"><span>• {{si.name}}</span><span class="text-gray-500">{{si.fullMark}}分</span></div></div>
-                <div v-if="gradesDetailAssessment.hasMultiplePapers && gradesDetailAssessment.papers" class="pt-2 border-t"><div class="text-gray-500 text-xs mb-1">分卷</div><div v-for="p in gradesDetailAssessment.papers" :key="p.id" class="text-xs text-gray-700 flex justify-between"><span>• {{p.name}}（{{p.fullMark}}分）</span><span class="text-gray-500">{{p.weight}}%</span></div></div>
+                <div v-if="gradesDetailAssessment.hasMultiplePapers && gradesDetailAssessment.papers" class="pt-2 border-t">
+                  <div class="text-gray-500 text-xs mb-1">分卷</div>
+                  <div v-for="p in gradesDetailAssessment.papers" :key="p.id" class="text-xs text-gray-700 flex justify-between">
+                    <span>• {{p.name}}（S1:{{p.fullMark}}<span v-if="p.fullMarkS2 != null && p.fullMarkS2 !== p.fullMark"> / S2:{{p.fullMarkS2}}</span>分）</span>
+                    <span class="text-gray-500">{{p.weight}}%</span>
+                  </div>
+                </div>
                 <div v-if="gradesDetailAssessment.hasAdjustedPaper" class="pt-2 border-t text-xs text-red-700"><i class="fas fa-exchange-alt mr-1"></i>調適卷：Set 2 × {{gradesDetailAssessment.adjustedMultiplier}}%，封頂 {{gradesDetailAssessment.passingScore}}分</div>
                 <div v-if="gradesDetailAssessment.type === 'quiz'" class="pt-2 border-t text-xs text-pink-700"><i class="fas fa-plus-circle mr-1"></i>支援加分：輸入「10+2」格式（計算時封頂於滿分）</div>
                 <div><span class="text-gray-500">備注</span><p v-if="gradesDetailAssessment.notes" class="mt-1 text-gray-700 bg-gray-50 rounded p-2 text-xs">{{gradesDetailAssessment.notes}}</p><p v-else class="mt-1 text-gray-300 text-xs italic">無備注</p></div>
@@ -1057,7 +1141,7 @@
             </div>
             <div class="shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between text-xs text-gray-400">
               <span>共 {{gradesSortedStudents.length}} 位學生 · {{gradesOrderedAssessments.length}} 個項目</span>
-              <span class="hidden sm:inline">小測輸入 "10+2" 可加分 · 方向鍵移動 · F2 微調 · Delete 清除 · Ctrl+Z 復原</span>
+              <span class="hidden sm:inline">小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼 · 方向鍵移動 · F2 微調 · Ctrl+Z 復原</span>
             </div>
           </template>
         </div>
@@ -1082,7 +1166,6 @@
             <div v-if="scoringSubTab==='settings'" class="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
               <div class="max-w-3xl mx-auto space-y-4">
 
-                <!-- ★ 項目歸屬 Section (獨立置頂) -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('attribution')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1119,7 +1202,6 @@
                   </div>
                 </div>
 
-                <!-- A. 統測計分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('ut')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1145,7 +1227,6 @@
                   </div>
                 </div>
 
-                <!-- B. 考試計分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('exam')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1178,7 +1259,6 @@
                   </div>
                 </div>
 
-                <!-- C. 全年總分設定 -->
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('yearly')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1196,7 +1276,6 @@
                   </div>
                 </div>
 
-                <!-- ★ 自動儲存提示（取代原來的手動儲存按鈕） -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700 flex items-center gap-2">
                   <i class="fas fa-cloud-upload-alt"></i>
                   <span>更改任何權重設定後會在 1.5 秒內自動儲存。切換「項目歸屬」會即時儲存。</span>
@@ -1822,6 +1901,8 @@
             <div @click="settingsEnter({key:'years',label:'學年管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><i class="fas fa-sitemap text-blue-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-blue-600">學年班別管理</h3></div><p class="text-sm text-gray-500">管理學年、班別、科目及學生</p></div>
             <div @click="settingsEnter({key:'layout',label:'外觀設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center shrink-0"><i class="fas fa-palette text-pink-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-pink-600">外觀設定</h3></div><p class="text-sm text-gray-500">自訂介面主題顏色與標籤排序</p></div>
             <div @click="settingsEnter({key:'quicknav',label:'快速導航設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-th-large text-green-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-green-600">快速導航設定</h3></div><p class="text-sm text-gray-500">自訂首頁快速導航項目</p></div>
+            <!-- ★ v14: Name templates entry -->
+            <div @click="settingsEnter({key:'nameTemplates',label:'名稱模板管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0"><i class="fas fa-tags text-amber-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-amber-600">名稱模板管理</h3></div><p class="text-sm text-gray-500">管理新增評估時的快速命名模板</p></div>
           </div>
 
           <div v-if="settingsCurrentView==='years'">
@@ -1988,6 +2069,52 @@
             <div class="bg-white rounded-xl shadow divide-y mb-6"><div v-for="(key,idx) in activeQuickNavKeys" :key="key" class="flex items-center px-3 sm:px-4 py-3"><i :class="getQuickNavItem(key).icon" class="text-gray-400 mr-3 w-5 text-center"></i><span class="flex-1 text-sm font-medium text-gray-700">{{getQuickNavItem(key).label}}</span><button @click="moveQuickNavUp(idx)" :disabled="idx===0" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-up text-xs"></i></button><button @click="moveQuickNavDown(idx)" :disabled="idx===activeQuickNavKeys.length-1" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-down text-xs"></i></button><button @click="removeQuickNav(idx)" class="p-1 text-gray-400 hover:text-red-500 ml-1"><i class="fas fa-times text-xs"></i></button></div><div v-if="activeQuickNavKeys.length===0" class="text-center text-gray-400 py-4 text-sm">尚無已啟用的快速導航</div></div>
             <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-3">可新增的項目</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><div v-for="item in inactiveQuickNavItems" :key="item.key" @click="addQuickNav(item.key)" class="bg-white rounded-lg shadow p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition group"><div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0" :style="{background:'linear-gradient(135deg,'+item.gradient[0]+','+item.gradient[1]+')'}"><i :class="item.icon" class="text-sm"></i></div><span class="text-sm font-medium text-gray-700 group-hover:text-blue-600">{{item.label}}</span><i class="fas fa-plus ml-auto text-gray-300 group-hover:text-blue-500 text-xs"></i></div></div>
+          </div>
+
+          <!-- ★ v14: Name Templates settings page -->
+          <div v-if="settingsCurrentView==='nameTemplates'">
+            <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-2">名稱模板管理</h2>
+            <p class="text-sm text-gray-500 mb-4">在此管理新增評估項目時，名稱輸入框下方顯示的快速插入模板。模板會以追加方式插入到名稱中，方便組合使用。</p>
+
+            <div class="bg-white rounded-xl shadow p-4 mb-4">
+              <h3 class="text-sm font-semibold text-gray-700 mb-2">新增模板</h3>
+              <div class="flex gap-2">
+                <input v-model="newNameTemplate" placeholder="例：工作紙、默寫、單元測試..." 
+                  @keydown.enter="addNameTemplate"
+                  class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+                <button @click="addNameTemplate" class="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 whitespace-nowrap">
+                  <i class="fas fa-plus mr-1"></i>新增
+                </button>
+              </div>
+              <p class="text-xs text-gray-400 mt-1.5">提示：按 Enter 鍵快速新增</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow overflow-hidden">
+              <div class="px-4 py-2.5 border-b bg-gray-50 text-sm font-semibold text-gray-700 flex items-center justify-between">
+                <span><i class="fas fa-list mr-1"></i>已有模板</span>
+                <span class="text-xs text-gray-500 font-normal">{{nameTemplates.length}} 個</span>
+              </div>
+              <div v-if="nameTemplates.length === 0" class="text-center text-gray-400 py-8 text-sm">
+                尚無模板，請於上方輸入並新增
+              </div>
+              <div v-else class="divide-y">
+                <div v-for="(tpl, idx) in nameTemplates" :key="idx" class="flex items-center px-4 py-2.5 hover:bg-gray-50 group">
+                  <span class="text-gray-400 text-xs mr-3 w-6 text-center">{{idx + 1}}</span>
+                  <span class="flex-1 text-sm text-gray-800">{{tpl}}</span>
+                  <span class="hidden sm:inline-block name-tpl-chip mr-2" style="margin:0">
+                    <i class="fas fa-eye text-xs mr-1 opacity-60"></i>{{tpl}}
+                  </span>
+                  <button @click="moveNameTemplateUp(idx)" :disabled="idx===0" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-up text-xs"></i></button>
+                  <button @click="moveNameTemplateDown(idx)" :disabled="idx===nameTemplates.length-1" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-down text-xs"></i></button>
+                  <button @click="removeNameTemplate(idx)" class="p-1 text-gray-400 hover:text-red-500 ml-1"><i class="fas fa-trash text-xs"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4 text-sm text-blue-700">
+              <i class="fas fa-info-circle mr-1"></i>
+              <strong>使用方式：</strong>於新增評估項目時，點擊「快速插入」下方的模板會將文字追加到名稱輸入框，您可繼續輸入更多文字（例如點選「工作紙」後再輸入「：分數運算」 ⇒ 成為「工作紙：分數運算」）。
+            </div>
           </div>
         </div>
       </main>
