@@ -1,5 +1,5 @@
 // ================================================================
-// Main Application (v13 — mobile load optimization, auto-term, scoring restructure)
+// Main Application (v14 — name templates, hover highlight, drag select, set fullMarks)
 // ================================================================
 const { createApp } = Vue;
 
@@ -11,6 +11,10 @@ createApp({
       settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{} },
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
       leftPanelOpen: true, expandedYears: {},
+
+      // ★ v14: Name templates
+      nameTemplates: ['工作紙', '默寫', '單元測試', '聆聽測驗', '說話練習', '閱讀理解', '寫作'],
+      newNameTemplate: '',
 
       calendarDate: new Date(),
       calendarWeekDate: new Date(),
@@ -40,13 +44,18 @@ createApp({
       gradesSelStart: null, gradesSelEnd: null,
       gradesHighlightUnenteredCol: -1,
       gradesShowFailHighlight: true, gradesFailPercent: null,
+      // ★ v14: Hover highlighting + drag selection state
+      gradesHoverRow: -1,
+      gradesIsDragging: false,
+      gradesDragStartCell: null,
+      // ★ v14: Inline Set 1/2 fullMark editing in detail panel
+      gradesDetailEditFullMark: '',
       gradesStatRows: [
         { key:'avg', label:'平均' }, { key:'max', label:'最高' }, { key:'min', label:'最低' },
         { key:'median', label:'中位數' }, { key:'stddev', label:'標準差' }, { key:'count', label:'已輸入' }
       ],
 
       scoringSubTab: 'settings',
-      // ★ v13: Removed 'custom' accordion, added 'attribution' (item attribution section, expanded by default)
       scoringAccordion: { attribution: true, ut: true, exam: false, yearly: false },
       scoringSaveStatus: '',
       scoringTooltip: null,
@@ -444,6 +453,71 @@ createApp({
     moveQuickNavDown(idx) { if(idx>=this.activeQuickNavKeys.length-1)return;const a=[...this.activeQuickNavKeys];[a[idx],a[idx+1]]=[a[idx+1],a[idx]];this.activeQuickNavKeys=a;this.saveQuickNavSettings(); },
     async saveQuickNavSettings() { try{await db.collection('settings').doc('main').set({activeQuickNavKeys:this.activeQuickNavKeys},{merge:true});}catch(e){console.error(e);} },
 
+    // ★ v14: Name template management
+    insertNameTemplate(tpl) {
+      // Append to current name (allows combining multiple templates or continuing to type after)
+      this.modalData.name = (this.modalData.name || '') + tpl;
+      // Focus the name input and place cursor at end
+      this.$nextTick(() => {
+        const inputs = document.querySelectorAll('input[name="assessmentName"]');
+        if (inputs.length > 0) {
+          const input = inputs[inputs.length - 1];
+          try {
+            input.focus();
+            const len = input.value.length;
+            input.setSelectionRange(len, len);
+          } catch (e) {}
+        }
+      });
+    },
+
+    async addNameTemplate() {
+      const tpl = (this.newNameTemplate || '').trim();
+      if (!tpl) { this.addToast('請輸入模板內容', 'warning'); return; }
+      if (this.nameTemplates.includes(tpl)) {
+        this.addToast('已有相同模板', 'warning');
+        return;
+      }
+      this.nameTemplates.push(tpl);
+      this.newNameTemplate = '';
+      await this.saveNameTemplates();
+      this.addToast('已新增模板「' + tpl + '」', 'success');
+    },
+
+    async removeNameTemplate(idx) {
+      const removed = this.nameTemplates[idx];
+      this.nameTemplates.splice(idx, 1);
+      await this.saveNameTemplates();
+      this.addToast('已刪除「' + removed + '」', 'success');
+    },
+
+    moveNameTemplateUp(idx) {
+      if (idx <= 0) return;
+      const a = [...this.nameTemplates];
+      [a[idx-1], a[idx]] = [a[idx], a[idx-1]];
+      this.nameTemplates = a;
+      this.saveNameTemplates();
+    },
+
+    moveNameTemplateDown(idx) {
+      if (idx >= this.nameTemplates.length - 1) return;
+      const a = [...this.nameTemplates];
+      [a[idx], a[idx+1]] = [a[idx+1], a[idx]];
+      this.nameTemplates = a;
+      this.saveNameTemplates();
+    },
+
+    async saveNameTemplates() {
+      try {
+        await db.collection('settings').doc('main').set({
+          nameTemplates: this.nameTemplates
+        }, { merge: true });
+      } catch (e) {
+        console.error('Save name templates failed:', e);
+        this.addToast('儲存模板失敗', 'error');
+      }
+    },
+
     addToast(message,type='success') { const id=++this.toastCounter;this.toasts.push({id,message,type});setTimeout(()=>this.removeToast(id),3000); },
     removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
 
@@ -514,6 +588,12 @@ createApp({
         .grades-cell.cell-bonus.cell-focused{background:#d1cdc4!important}
         .grades-cell input{position:absolute!important;top:-1px!important;left:-1px!important;width:calc(100% + 2px)!important;height:calc(100% + 2px)!important;box-sizing:border-box!important;margin:0!important;padding:0 4px!important;border:2px solid #3b82f6!important;border-radius:1px!important;outline:none!important;background:#fff!important;text-align:center!important;font-size:inherit!important;font-family:inherit!important;line-height:inherit!important;z-index:5!important;min-width:0!important;max-width:none!important}
         .grades-cell input:focus{border-color:#2563eb!important;box-shadow:0 0 0 1px rgba(37,99,235,.2)!important}
+        /* ★ v14: Hover row highlighting on frozen columns */
+        .grades-table tr.row-hover-highlight .frozen-sn,
+        .grades-table tr.row-hover-highlight .frozen-name,
+        .grades-table tr.row-hover-highlight .frozen-class { background:#eff6ff !important; transition: background-color .12s }
+        /* Prevent text selection during drag */
+        .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
       `;
       document.head.appendChild(style);
     }
@@ -539,6 +619,13 @@ createApp({
       this.gradesDetailPanel=null;
       this.scoringCopyMenuOpen=false;
       this.scoringTooltip=null;
+    });
+    // ★ v14: Document-level mouseup ends drag selection regardless of where mouse is released
+    document.addEventListener('mouseup', () => {
+      if (this.gradesIsDragging) {
+        this.gradesIsDragging = false;
+        this.gradesDragStartCell = null;
+      }
     });
     this.$watch(()=>this.modalData.studentName,(nv)=>{
       if(this.modalType==='addStudent'&&nv&&nv.trim().length>0){const m=this.globalStudents.find(g=>g.name===nv.trim());this.modalData.matchedGlobal=m||null;if(!m)this.modalData.linkToGlobal=false;}

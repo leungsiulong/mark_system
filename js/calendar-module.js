@@ -1,5 +1,5 @@
 // ================================================================
-// Calendar Module (v6 — full interactivity: popover, week view, filters, jump-to-grades)
+// Calendar Module (v7 — supports fullMarkS2 in calendar-added exam events)
 // ================================================================
 const CalendarMethods = {
   // ---------- Month navigation ----------
@@ -7,12 +7,10 @@ const CalendarMethods = {
   calNext() { const d=new Date(this.calendarDate);d.setMonth(d.getMonth()+1);this.calendarDate=d; },
   calToday() { this.calendarDate=new Date(); },
 
-  // ---------- Week navigation ----------
   calWeekPrev() { const d=new Date(this.calendarWeekDate);d.setDate(d.getDate()-7);this.calendarWeekDate=d; },
   calWeekNext() { const d=new Date(this.calendarWeekDate);d.setDate(d.getDate()+7);this.calendarWeekDate=d; },
   calWeekToday() { this.calendarWeekDate=new Date(); },
 
-  // ---------- View switch ----------
   calSetView(view) {
     this.calendarView = view;
     if (view === 'week') this.calendarWeekDate = new Date(this.calendarDate);
@@ -21,15 +19,12 @@ const CalendarMethods = {
     this.calendarMoreEventsModal = null;
   },
 
-  // ---------- Type filter ----------
   calToggleTypeFilter(type) {
     this.calendarTypeFilter = { ...this.calendarTypeFilter, [type]: !this.calendarTypeFilter[type] };
   },
 
-  // ---------- Event lookup ----------
   getEventsForDate(d) { return this.allEventsMap[this.dateToStr(d)] || []; },
 
-  // ---------- Day click handlers ----------
   onCalendarDayClick(day) {
     if (!day.isCurrentMonth) return;
     this.openCalendarAddModal(day.date);
@@ -69,6 +64,7 @@ const CalendarMethods = {
       notes: '',
       hasSubItems: false, subItems: [],
       hasAdjustedPaper: false, adjustedMultiplier: 80, passingScore: 50,
+      fullMarkS2: '',
       hasMultiplePapers: false, papers: []
     });
   },
@@ -76,13 +72,11 @@ const CalendarMethods = {
   _autoSelectTermByDate(cls, date) {
     if (!cls.terms || cls.terms.length === 0) return null;
     if (cls.terms.length === 1) return cls.terms[0].id;
-    // Default heuristic: Sep-Jan → first term; Feb-Aug → second term
     const m = date.getMonth() + 1;
     if (m >= 9 || m === 1) return cls.terms[0].id;
     return cls.terms[Math.min(1, cls.terms.length - 1)].id;
   },
 
-  // ---------- Modal field handlers ----------
   onCalModalYearChange() { this.modalData.classId = null; this.modalData.termId = null; this.modalData.name = ''; },
   onCalModalClassChange() {
     this.modalData.termId = null; this.modalData.name = '';
@@ -94,13 +88,11 @@ const CalendarMethods = {
         this.modalData.termId = this._autoSelectTermByDate(cls, refDate);
       }
     }
-    // Reset type if it conflicts with existing UT/exam
     if (this.modalData.type === 'unified_test' && this.calendarExistingUT) this.modalData.type = 'assignment';
     if (this.modalData.type === 'exam' && this.calendarExistingExam) this.modalData.type = 'assignment';
   },
 
   onCalModalTermChange() {
-    // Reset type if it conflicts
     if (this.modalData.type === 'unified_test' && this.calendarExistingUT) this.modalData.type = 'assignment';
     if (this.modalData.type === 'exam' && this.calendarExistingExam) this.modalData.type = 'assignment';
   },
@@ -115,20 +107,18 @@ const CalendarMethods = {
       return;
     }
     this.modalData.type = newType;
-    // Reset structural options if switching away from exam
     if (newType !== 'exam') {
       this.modalData.hasAdjustedPaper = false;
       this.modalData.hasMultiplePapers = false;
       this.modalData.papers = [];
+      this.modalData.fullMarkS2 = '';
     }
-    // Disable sub-items for class_performance/unified_test
     if (newType === 'unified_test') {
       this.modalData.hasSubItems = false;
       this.modalData.subItems = [];
     }
   },
 
-  // ---------- Event click / popover ----------
   onEventClick(event, evt) {
     if (evt) evt.stopPropagation();
     const rect = evt ? evt.currentTarget.getBoundingClientRect() : { left: window.innerWidth/2, top: window.innerHeight/3, width: 0, height: 0, bottom: window.innerHeight/3 };
@@ -163,7 +153,6 @@ const CalendarMethods = {
   calClosePopover() { this.calendarEventPopover = null; },
   calCloseMoreEventsModal() { this.calendarMoreEventsModal = null; },
 
-  // ---------- Progress calculation ----------
   calEventProgress(event) {
     const cls = this.getClassObj(event.yearId, event.classId);
     if (!cls) return { entered: 0, total: 0, avg: null, passRate: null };
@@ -186,7 +175,6 @@ const CalendarMethods = {
     return { entered, total, avg, passRate };
   },
 
-  // ---------- Jump to grades ----------
   calJumpToGradesFromEvent(event) {
     const yearId = event.yearId, classId = event.classId, termId = event.termId, assessmentId = event.id;
     this.calClosePopover();
@@ -197,7 +185,6 @@ const CalendarMethods = {
     this.currentView = 'grades';
     this.$nextTick(() => {
       setTimeout(() => {
-        // Re-assert termId in case watcher overrode it
         if (this.gradesTermId !== termId) this.gradesTermId = termId;
         this.$nextTick(() => {
           setTimeout(() => { this.gradesScrollToColumn(assessmentId); }, 100);
@@ -206,7 +193,6 @@ const CalendarMethods = {
     });
   },
 
-  // ---------- Edit/Delete from popover ----------
   calEditEventFromPopover() {
     if (!this.calendarEventPopover) return;
     const ev = this.calendarEventPopover.event;
@@ -223,6 +209,7 @@ const CalendarMethods = {
       hasAdjustedPaper: ev.hasAdjustedPaper || false,
       adjustedMultiplier: ev.adjustedMultiplier != null ? ev.adjustedMultiplier : 80,
       passingScore: ev.passingScore != null ? ev.passingScore : 50,
+      fullMarkS2: ev.fullMarkS2 != null ? ev.fullMarkS2 : '',
       hasMultiplePapers: ev.hasMultiplePapers || false,
       papers: ev.hasMultiplePapers ? JSON.parse(JSON.stringify(ev.papers || [])) : [],
       yearId: ev.yearId,
@@ -246,11 +233,10 @@ const CalendarMethods = {
     });
   },
 
-  // ---------- Calendar add confirm ----------
   async calAddAssessmentConfirm() {
     const { date, yearId, classId, termId, type, name, fullMark, notes,
       hasSubItems, subItems,
-      hasAdjustedPaper, adjustedMultiplier, passingScore,
+      hasAdjustedPaper, adjustedMultiplier, passingScore, fullMarkS2,
       hasMultiplePapers, papers } = this.modalData;
 
     if (!yearId || !classId || !termId) { this.addToast('請選擇學年、班別和學期', 'warning'); return; }
@@ -259,7 +245,6 @@ const CalendarMethods = {
     const term = cls && cls.terms && cls.terms.find(t => t.id === termId);
     if (!term) { this.addToast('找不到學期', 'error'); return; }
 
-    // UT/Exam conflict check
     if (type === 'unified_test' && (term.assessments || []).some(a => a.type === 'unified_test')) {
       this.addToast('該班別該學期已有統測', 'warning'); return;
     }
@@ -267,7 +252,6 @@ const CalendarMethods = {
       this.addToast('該班別該學期已有考試', 'warning'); return;
     }
 
-    // Auto-name
     let aName = (name || '').trim();
     if (!aName) {
       const all = term.assessments || [];
@@ -281,7 +265,6 @@ const CalendarMethods = {
     const fm = parseInt(fullMark);
     if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
 
-    // Sub-items validation
     let finalSubItems = [];
     if (hasSubItems) {
       if (!subItems || subItems.length === 0) { this.addToast('請至少新增一個小項目', 'warning'); return; }
@@ -296,7 +279,6 @@ const CalendarMethods = {
       }
     }
 
-    // Papers validation
     let finalPapers = [];
     if (type === 'exam' && hasMultiplePapers) {
       if (!papers || papers.length === 0) { this.addToast('請至少新增一個分卷', 'warning'); return; }
@@ -306,10 +288,15 @@ const CalendarMethods = {
         const pw = parseFloat(p.weight);
         if (isNaN(pfm) || pfm <= 0) { this.addToast('分卷滿分無效', 'warning'); return; }
         if (isNaN(pw) || pw < 0) { this.addToast('分卷權重無效', 'warning'); return; }
-        finalPapers.push({
+        const paperObj = {
           id: 'pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
           name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
-        });
+        };
+        const pfmS2 = parseFloat(p.fullMarkS2);
+        if (hasAdjustedPaper && !isNaN(pfmS2) && pfmS2 > 0 && pfmS2 !== pfm) {
+          paperObj.fullMarkS2 = pfmS2;
+        }
+        finalPapers.push(paperObj);
       }
     }
 
@@ -332,6 +319,10 @@ const CalendarMethods = {
         data.hasAdjustedPaper = true;
         data.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
         data.passingScore = parseFloat(passingScore) || 50;
+        const fmS2Val = parseFloat(fullMarkS2);
+        if (!hasMultiplePapers && !isNaN(fmS2Val) && fmS2Val > 0 && fmS2Val !== fm) {
+          data.fullMarkS2 = fmS2Val;
+        }
         data.adjustedScores = {};
       }
       if (hasMultiplePapers && finalPapers.length > 0) {
@@ -406,7 +397,6 @@ const CalendarComputed = {
         if (this.calendarFilter !== 'all' && c.id !== this.calendarFilter) continue;
         for (const t of c.terms || []) {
           for (const a of t.assessments || []) {
-            // Apply type filter: only 4 main types can be toggled; others always shown
             if (['assignment', 'quiz', 'unified_test', 'exam'].includes(a.type) && tf[a.type] === false) continue;
             if (a.date) {
               if (!map[a.date]) map[a.date] = [];
@@ -424,7 +414,6 @@ const CalendarComputed = {
         }
       }
     }
-    // Sort by order/type within each day
     for (const k in map) map[k].sort((x, y) => (x.order || 0) - (y.order || 0));
     return map;
   },

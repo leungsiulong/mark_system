@@ -1,18 +1,14 @@
 // ================================================================
-// CRUD Operations (v9 — parallel loading for mobile performance)
+// CRUD Operations (v10 — name templates, fullMarkS2 support)
 // ================================================================
 const CrudMethods = {
 
-  // ★ v9: Completely rewritten load with Promise.all parallelism
-  // Previously: sequential awaits inside nested for-loops caused 600+ serial HTTP requests.
-  // Now: parallel requests at every layer reduce total wait from ~minutes to seconds on mobile.
   async loadAllData() {
     try {
       this.loading = true;
       this.loadingText = '正在連接伺服器...';
       this.loadingProgress = 5;
 
-      // Step 1: Load settings + academicYears list + globalStudents in parallel
       this.loadingText = '正在載入基本資料...';
       const [settingsSnap, yearsSnap, globalSnap] = await Promise.all([
         db.collection('settings').doc('main').get(),
@@ -21,7 +17,6 @@ const CrudMethods = {
       ]);
       this.loadingProgress = 20;
 
-      // Process settings
       if (settingsSnap.exists) {
         const d = settingsSnap.data();
         this.settings = { ...this.settings, ...d };
@@ -32,9 +27,12 @@ const CrudMethods = {
           this.tabOrder = valid;
         }
         if (d.activeQuickNavKeys && Array.isArray(d.activeQuickNavKeys)) this.activeQuickNavKeys = d.activeQuickNavKeys;
+        // ★ v14: Load name templates from settings/main
+        if (d.nameTemplates && Array.isArray(d.nameTemplates)) {
+          this.nameTemplates = d.nameTemplates;
+        }
       }
 
-      // Process global students
       this.globalStudents = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       if (yearsSnap.docs.length === 0) {
@@ -44,7 +42,6 @@ const CrudMethods = {
         return;
       }
 
-      // Step 2: Load all classes for all years IN PARALLEL
       this.loadingText = '正在載入班別資料...';
       const yearDocs = yearsSnap.docs;
       const classesPerYearPromises = yearDocs.map(yD =>
@@ -53,7 +50,6 @@ const CrudMethods = {
       const classesPerYearSnaps = await Promise.all(classesPerYearPromises);
       this.loadingProgress = 40;
 
-      // Build year objects with class shells
       const years = yearDocs.map((yD, i) => {
         const year = { id: yD.id, ...yD.data(), classes: [] };
         const cs = classesPerYearSnaps[i];
@@ -61,7 +57,6 @@ const CrudMethods = {
           const cls = { id: cD.id, ...cD.data(), students: [], terms: [], _yearId: yD.id };
           if (!cls.customCategories) cls.customCategories = [];
 
-          // Migrate classType on load (in-memory only)
           if (!cls.classType) {
             cls.classType = cls.subject ? 'subject' : 'regular';
           } else if (cls.classType === 'gradeRoster') {
@@ -83,7 +78,6 @@ const CrudMethods = {
         return year;
       });
 
-      // Flatten list of all classes (for parallel student + term fetch)
       const allClasses = [];
       years.forEach(year => year.classes.forEach(cls => allClasses.push(cls)));
 
@@ -95,7 +89,6 @@ const CrudMethods = {
         return;
       }
 
-      // Step 3: Load all students + all terms IN PARALLEL across all classes
       this.loadingText = '正在載入學生及學期...';
       const studentsPromises = allClasses.map(cls =>
         db.collection('academicYears').doc(cls._yearId).collection('classes').doc(cls.id)
@@ -111,7 +104,6 @@ const CrudMethods = {
       ]);
       this.loadingProgress = 65;
 
-      // Populate students + term shells
       allClasses.forEach((cls, i) => {
         cls.students = studentsSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }));
         cls.terms = termsSnaps[i].docs.map(tD => ({
@@ -119,7 +111,6 @@ const CrudMethods = {
         }));
       });
 
-      // Step 4: Load all assessments for all terms IN PARALLEL
       this.loadingText = '正在載入評估項目...';
       const allTerms = [];
       allClasses.forEach(cls => cls.terms.forEach(t => allTerms.push(t)));
@@ -143,13 +134,11 @@ const CrudMethods = {
             if (data.type === 'exam' && !data.adjustedScores) data.adjustedScores = {};
             return data;
           });
-          // Clean up tracking props
           delete t._classId;
           delete t._yearId;
         });
       }
 
-      // Clean up tracking props from classes
       allClasses.forEach(cls => delete cls._yearId);
 
       this.loadingText = '完成';
@@ -157,7 +146,6 @@ const CrudMethods = {
       this.academicYears = years;
       if (years.length > 0) this.expandedYears = { [years[0].id]: true };
 
-      // Small delay for user to perceive completion, then hide loader
       setTimeout(() => { this.loading = false; }, 150);
     } catch (err) {
       console.error(err); this.error = err.message; this.loading = false;
@@ -195,7 +183,6 @@ const CrudMethods = {
 
   async deleteAcademicYear(yearId) {
     const year = this.academicYears.find(y => y.id === yearId); if (!year) return;
-    // ★ v9: Parallelize deletions
     const deletionPromises = [];
     for (const cls of year.classes) {
       for (const s of cls.students) deletionPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('students').doc(s.id).delete());
@@ -204,7 +191,6 @@ const CrudMethods = {
       }
     }
     await Promise.all(deletionPromises);
-    // Then delete terms + classes sequentially (they depend on subcollections)
     for (const cls of year.classes) {
       for (const t of cls.terms || []) await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('terms').doc(t.id).delete();
       await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).delete();
@@ -300,7 +286,6 @@ const CrudMethods = {
     };
     year.classes.push(nc);
 
-    // ★ v9: Parallelize student creation
     if (initialStudents.length > 0) {
       const studentPromises = initialStudents.map(s =>
         cr.collection('students').add({
@@ -382,7 +367,6 @@ const CrudMethods = {
       });
       const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
 
-      // ★ v9: Parallelize term + students
       const [t1, t2] = await Promise.all([
         cr.collection('terms').add({ name: '上學期' }),
         cr.collection('terms').add({ name: '下學期' })
@@ -404,7 +388,6 @@ const CrudMethods = {
       };
       year.classes.push(nc);
 
-      // Parallelize student additions
       if (baseClass.students.length > 0) {
         const studentPromises = baseClass.students.map(s =>
           cr.collection('students').add({
@@ -469,7 +452,6 @@ const CrudMethods = {
           return;
         }
         const linked = year.classes.filter(c => c.className === oldName && (c.classType === 'regular' || c.classType === 'subject'));
-        // ★ v9: Parallelize updates
         await Promise.all(linked.map(c =>
           db.collection('academicYears').doc(yearId).collection('classes').doc(c.id).update({ className: newName })
         ));
@@ -520,7 +502,6 @@ const CrudMethods = {
       targets.push(...linked);
     }
 
-    // ★ v9: Parallelize deep deletions
     const studentDeletions = [];
     const assessmentDeletions = [];
     for (const t of targets) {
@@ -535,7 +516,6 @@ const CrudMethods = {
     }
     await Promise.all([...studentDeletions, ...assessmentDeletions]);
 
-    // Then delete terms
     const termDeletions = [];
     for (const t of targets) {
       for (const term of t.terms || []) {
@@ -544,7 +524,6 @@ const CrudMethods = {
     }
     await Promise.all(termDeletions);
 
-    // Finally delete classes
     await Promise.all(targets.map(t => db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).delete()));
 
     const deletedIds = targets.map(t => t.id);
@@ -593,7 +572,6 @@ const CrudMethods = {
       this.globalStudents.push({ id: gr.id, name: studentName.trim(), records: [...recordsToAdd] });
     }
 
-    // ★ v9: Parallelize per-target student creation
     const addPromises = targets.map(t =>
       db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
         studentNumber: studentNumber.trim(), studentName: studentName.trim(), globalStudentId: gid,
@@ -634,7 +612,6 @@ const CrudMethods = {
       }
     }
 
-    // ★ v9: Parallelize target updates
     const updatePromises = [];
     const localUpdates = [];
     for (const t of targets) {
@@ -678,7 +655,6 @@ const CrudMethods = {
     const gid = stu.globalStudentId;
     const targets = this._getLinkedClasses(yearId, cls);
     let count = 0;
-    // ★ v9: Parallelize deletions
     const delPromises = [];
     const localRemovals = [];
     for (const t of targets) {
@@ -728,7 +704,6 @@ const CrudMethods = {
     }
 
     const recordsForAll = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
-    // ★ v9: Parallelize all student creation
     const allPromises = [];
     const globalStudentResults = [];
     for (const s of students) {
@@ -780,6 +755,7 @@ const CrudMethods = {
       name, fullMark: 100, date: '', notes: '',
       hasSubItems: false, subItems: [],
       hasAdjustedPaper: false, adjustedMultiplier: 80, passingScore: 50,
+      fullMarkS2: '', // ★ v14
       hasMultiplePapers: false, papers: [],
       yearId: this.currentAcademicYearId, classId: this.currentClassId, termId: this.gradesTermId
     });
@@ -788,7 +764,7 @@ const CrudMethods = {
   async addAssessmentConfirm() {
     const { type, period, customCategoryId, name, fullMark, date, notes, yearId, classId, termId,
       hasSubItems, subItems,
-      hasAdjustedPaper, adjustedMultiplier, passingScore,
+      hasAdjustedPaper, adjustedMultiplier, passingScore, fullMarkS2,
       hasMultiplePapers, papers } = this.modalData;
     if (!name.trim()) { this.addToast('請輸入名稱', 'warning'); return; }
     const fm = parseInt(fullMark); if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
@@ -814,10 +790,16 @@ const CrudMethods = {
         const pw = parseFloat(p.weight);
         if (isNaN(pfm) || pfm <= 0) { this.addToast('分卷滿分無效', 'warning'); return; }
         if (isNaN(pw) || pw < 0) { this.addToast('分卷權重無效', 'warning'); return; }
-        finalPapers.push({
+        const paperObj = {
           id: (p.id && !String(p.id).startsWith('new_')) ? p.id : ('pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
           name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
-        });
+        };
+        // ★ v14: Per-paper Set 2 fullMark (only when adjusted paper enabled)
+        const pfmS2 = parseFloat(p.fullMarkS2);
+        if (hasAdjustedPaper && !isNaN(pfmS2) && pfmS2 > 0 && pfmS2 !== pfm) {
+          paperObj.fullMarkS2 = pfmS2;
+        }
+        finalPapers.push(paperObj);
       }
     }
     const cls = this.getClassObj(yearId, classId); const term = cls?.terms?.find(t => t.id === termId); if (!term) return;
@@ -832,8 +814,22 @@ const CrudMethods = {
     if (type === 'custom') data.customCategoryId = customCategoryId;
     if (hasSubItems && finalSubItems.length > 0) { data.hasSubItems = true; data.subItems = finalSubItems; data.subItemScores = {}; }
     if (type === 'exam') {
-      if (hasAdjustedPaper) { data.hasAdjustedPaper = true; data.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80; data.passingScore = parseFloat(passingScore) || 50; data.adjustedScores = {}; }
-      if (hasMultiplePapers && finalPapers.length > 0) { data.hasMultiplePapers = true; data.papers = finalPapers; data.paperScores = {}; }
+      if (hasAdjustedPaper) {
+        data.hasAdjustedPaper = true;
+        data.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
+        data.passingScore = parseFloat(passingScore) || 50;
+        // ★ v14: Top-level Set 2 fullMark (only meaningful when not multi-paper)
+        const fmS2Val = parseFloat(fullMarkS2);
+        if (!hasMultiplePapers && !isNaN(fmS2Val) && fmS2Val > 0 && fmS2Val !== fm) {
+          data.fullMarkS2 = fmS2Val;
+        }
+        data.adjustedScores = {};
+      }
+      if (hasMultiplePapers && finalPapers.length > 0) {
+        data.hasMultiplePapers = true;
+        data.papers = finalPapers;
+        data.paperScores = {};
+      }
     }
     const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').add(data);
     if (!term.assessments) term.assessments = [];
@@ -844,7 +840,7 @@ const CrudMethods = {
   async updateAssessmentConfirm() {
     const { assessmentId, name, fullMark, date, notes, yearId, classId, termId,
       hasSubItems, subItems,
-      hasAdjustedPaper, adjustedMultiplier, passingScore,
+      hasAdjustedPaper, adjustedMultiplier, passingScore, fullMarkS2,
       hasMultiplePapers, papers } = this.modalData;
     if (!name.trim()) { this.addToast('請輸入名稱', 'warning'); return; }
     const fm = parseInt(fullMark);
@@ -878,10 +874,15 @@ const CrudMethods = {
         const pw = parseFloat(p.weight);
         if (isNaN(pfm) || pfm <= 0) { this.addToast('分卷滿分無效', 'warning'); return; }
         if (isNaN(pw) || pw < 0) { this.addToast('分卷權重無效', 'warning'); return; }
-        finalPapers.push({
+        const paperObj = {
           id: (p.id && !String(p.id).startsWith('new_')) ? p.id : ('pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
           name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
-        });
+        };
+        const pfmS2 = parseFloat(p.fullMarkS2);
+        if (hasAdjustedPaper && !isNaN(pfmS2) && pfmS2 > 0 && pfmS2 !== pfm) {
+          paperObj.fullMarkS2 = pfmS2;
+        }
+        finalPapers.push(paperObj);
       }
     }
 
@@ -918,6 +919,13 @@ const CrudMethods = {
         a.hasAdjustedPaper = true;
         a.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
         a.passingScore = parseFloat(passingScore) || 50;
+        // ★ v14: handle fullMarkS2
+        const fmS2Val = parseFloat(fullMarkS2);
+        if (!hasMultiplePapers && !isNaN(fmS2Val) && fmS2Val > 0 && fmS2Val !== fm) {
+          a.fullMarkS2 = fmS2Val;
+        } else {
+          delete a.fullMarkS2;
+        }
         if (!wasAdjustedPaper && !hasMultiplePapers) {
           a.adjustedScores = a.adjustedScores || {};
         }
@@ -925,6 +933,7 @@ const CrudMethods = {
         a.hasAdjustedPaper = false;
         delete a.adjustedMultiplier;
         delete a.passingScore;
+        delete a.fullMarkS2;
         delete a.adjustedScores;
         if (!hasMultiplePapers && !hasSubItems) a.scores = {};
       }
@@ -989,6 +998,8 @@ const CrudMethods = {
         updateData.hasAdjustedPaper = true;
         updateData.adjustedMultiplier = a.adjustedMultiplier;
         updateData.passingScore = a.passingScore;
+        if (a.fullMarkS2 != null) updateData.fullMarkS2 = a.fullMarkS2;
+        else updateData.fullMarkS2 = firebase.firestore.FieldValue.delete();
         if (!a.hasMultiplePapers) {
           updateData.adjustedScores = a.adjustedScores || {};
         }
@@ -996,6 +1007,7 @@ const CrudMethods = {
         updateData.hasAdjustedPaper = false;
         updateData.adjustedMultiplier = firebase.firestore.FieldValue.delete();
         updateData.passingScore = firebase.firestore.FieldValue.delete();
+        updateData.fullMarkS2 = firebase.firestore.FieldValue.delete();
         updateData.adjustedScores = firebase.firestore.FieldValue.delete();
       }
 
@@ -1042,7 +1054,6 @@ const CrudMethods = {
       customCategories: cls.customCategories,
       scoreConfig: cls.scoreConfig
     });
-    // ★ v13: Sync local scoringWeightsLocal so UI reflects new category immediately
     if (this.currentAcademicYearId === yearId && this.currentClassId === classId) {
       this._scoringSkipWatch = true;
       if (!this.scoringWeightsLocal.ut.customCategories) this.scoringWeightsLocal.ut.customCategories = {};
@@ -1061,7 +1072,6 @@ const CrudMethods = {
     cls.customCategories = (cls.customCategories || []).filter(c => c.id !== categoryId);
     if (cls.scoreConfig?.ut?.customCategories) delete cls.scoreConfig.ut.customCategories[categoryId];
     if (cls.scoreConfig?.exam?.a1Weights?.customCategories) delete cls.scoreConfig.exam.a1Weights.customCategories[categoryId];
-    // ★ v9: Parallelize assessment deletions
     const delPromises = [];
     for (const t of cls.terms || []) {
       const toDelete = (t.assessments || []).filter(a => a.type === 'custom' && a.customCategoryId === categoryId);
@@ -1075,7 +1085,6 @@ const CrudMethods = {
       customCategories: cls.customCategories,
       scoreConfig: cls.scoreConfig
     });
-    // ★ v13: Sync local scoringWeightsLocal
     if (this.currentAcademicYearId === yearId && this.currentClassId === classId) {
       this._scoringSkipWatch = true;
       if (this.scoringWeightsLocal.ut.customCategories) delete this.scoringWeightsLocal.ut.customCategories[categoryId];

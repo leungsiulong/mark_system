@@ -1,13 +1,9 @@
 // ================================================================
-// Grades Module (v9 — date-based auto term selection)
+// Grades Module (v10 — drag select, smart copy, hover highlight, set fullMarkS2)
 // ================================================================
 
 const GradesMethods = {
 
-  // ★ v9: Auto-select term based on current date
-  // - Sep to Jan (month 9-12, 1) → first term (上學期)
-  // - Feb to Aug (month 2-8) → second term (下學期)
-  // Only auto-select when no valid term is currently selected (preserves user's manual choice)
   gradesAutoSelectTerm() {
     if (this.currentClass && this.currentClass.terms && this.currentClass.terms.length > 0) {
       if (!this.gradesTermId || !this.currentClass.terms.find(t => t.id === this.gradesTermId)) {
@@ -28,6 +24,9 @@ const GradesMethods = {
     this.gradesHeaderMenu = null; this.gradesDetailPanel = null;
     this.gradesSelStart = null; this.gradesSelEnd = null;
     this.gradesUndoStack = []; this.gradesHighlightUnenteredCol = -1;
+    this.gradesHoverRow = -1;
+    this.gradesIsDragging = false;
+    this.gradesDragStartCell = null;
   },
 
   gradesFocusCell(row, col, extend) {
@@ -63,6 +62,40 @@ const GradesMethods = {
         if (!isSameCell) { try { el.select(); } catch (e) {} }
       }
     });
+  },
+
+  // ★ v14: Mouse down handler – initiates drag selection or shift+click extend
+  gradesOnCellMouseDown(ri, ci, ev) {
+    if (ev.button !== 0) return; // left click only
+    // If clicking inside the active edit input, let the input handle it natively
+    if (this.gradesFocusRow === ri && this.gradesFocusCol === ci && ev.target && ev.target.tagName === 'INPUT') {
+      return;
+    }
+    ev.preventDefault();
+    const col = this.gradesOrderedColumns[ci];
+    if (!col) return;
+
+    // Shift+click: extend selection from current focus to clicked cell (no drag)
+    if (ev.shiftKey && this.gradesFocusRow >= 0 && this.gradesFocusCol >= 0) {
+      this.gradesSelStart = { row: this.gradesFocusRow, col: this.gradesFocusCol };
+      this.gradesSelEnd = { row: ri, col: ci };
+      return;
+    }
+
+    // Initiate drag selection
+    this.gradesIsDragging = true;
+    this.gradesDragStartCell = { row: ri, col: ci };
+
+    if (col.readOnly) {
+      // For readonly cells: clear focus, set selection only
+      this.gradesSaveCurrentCell();
+      this.gradesFocusRow = -1; this.gradesFocusCol = -1;
+      this.gradesEditValue = ''; this.gradesCellOriginalValue = '';
+      this.gradesSelStart = { row: ri, col: ci };
+      this.gradesSelEnd = { row: ri, col: ci };
+    } else {
+      this.gradesFocusCell(ri, ci);
+    }
   },
 
   gradesParseInputValue(str, colSpec) {
@@ -132,6 +165,32 @@ const GradesMethods = {
     return '';
   },
 
+  // ★ v14: Returns the pure numeric value for clipboard (no formula, no asterisk)
+  gradesGetCopyValue(studentId, ci) {
+    const col = this.gradesOrderedColumns[ci];
+    if (!col) return '';
+    const a = col.assessment;
+
+    // Simple cells (assignment, quiz, etc.) – use effective (capped) value
+    if (col.colType === 'simple') {
+      const eff = this._getEffScore(a, studentId);
+      if (eff === null || eff === undefined) return '';
+      return Number.isInteger(eff) ? String(eff) : parseFloat(eff).toFixed(1);
+    }
+
+    // Read-only computed totals – return the computed score directly
+    if (col.colType === 'subitem-total' || col.colType === 'exam-adjusted-total' ||
+        col.colType === 'paper-total' || col.colType === 'exam-papers-total') {
+      const v = (a.scores || {})[studentId];
+      if (v == null) return '';
+      return Number.isInteger(v) ? String(v) : parseFloat(v).toFixed(1);
+    }
+
+    // Sub-item / paper / set1 / set2 inputs – return raw numeric input
+    const raw = this.gradesGetRawScoreForInput(studentId, ci);
+    return raw === '' || raw == null ? '' : String(raw);
+  },
+
   gradesWriteCell(row, col, value) {
     const stu = this.gradesSortedStudents[row];
     const colSpec = this.gradesOrderedColumns[col];
@@ -196,12 +255,19 @@ const GradesMethods = {
     else delete a.scores[sid];
   },
 
-  _gradesApplyAdjusted(setVal, set, multiplier, passingScore, fullMark) {
+  // ★ v14: Updated signature to accept independent fullMark for Set 1 and Set 2
+  // Behavior: Set 2 raw score is converted to Set 1 scale via ratio, then multiplier and cap applied.
+  // Backward compatible: when fullMarkS2 omitted/null, defaults to fullMarkS1 → identical to original logic.
+  _gradesApplyAdjusted(setVal, set, multiplier, passingScore, fullMarkS1, fullMarkS2) {
     if (setVal == null) return null;
-    if (set === 1) return Math.min(parseFloat(setVal), fullMark);
-    const adj = parseFloat(setVal) * (multiplier / 100);
-    const cap = passingScore != null ? passingScore : fullMark;
-    return Math.min(adj, cap, fullMark);
+    const v = parseFloat(setVal);
+    if (isNaN(v)) return null;
+    if (set === 1) return Math.min(v, fullMarkS1);
+    const fmS2 = (fullMarkS2 != null && !isNaN(fullMarkS2) && fullMarkS2 > 0) ? fullMarkS2 : fullMarkS1;
+    const inSet1Scale = (v / fmS2) * fullMarkS1;       // convert to S1 scale
+    const adj = inSet1Scale * (multiplier / 100);      // apply multiplier
+    const cap = passingScore != null ? passingScore : fullMarkS1;
+    return Math.min(adj, cap, fullMarkS1);
   },
 
   _gradesRecomputeExamAdjustedTotal(a, sid) {
@@ -209,8 +275,10 @@ const GradesMethods = {
     let final = null;
     const mult = a.adjustedMultiplier || 80;
     const pass = a.passingScore != null ? a.passingScore : (a.fullMark * 0.5);
-    if (rec.set1 != null && rec.set1 !== '') final = Math.min(parseFloat(rec.set1), a.fullMark);
-    else if (rec.set2 != null && rec.set2 !== '') final = this._gradesApplyAdjusted(rec.set2, 2, mult, pass, a.fullMark);
+    const fmS1 = a.fullMark;
+    const fmS2 = (a.fullMarkS2 != null && !isNaN(a.fullMarkS2) && a.fullMarkS2 > 0) ? a.fullMarkS2 : a.fullMark;
+    if (rec.set1 != null && rec.set1 !== '') final = Math.min(parseFloat(rec.set1), fmS1);
+    else if (rec.set2 != null && rec.set2 !== '') final = this._gradesApplyAdjusted(rec.set2, 2, mult, pass, fmS1, fmS2);
     if (!a.scores) a.scores = {};
     if (final !== null) a.scores[sid] = final;
     else delete a.scores[sid];
@@ -223,26 +291,26 @@ const GradesMethods = {
     let totalWeight = 0, weightedSum = 0, hasAny = false;
     const mult = a.adjustedMultiplier || 80;
     const pass = a.passingScore != null ? a.passingScore : (a.fullMark * 0.5);
-    for (const p of papers) {
-      totalWeight += (p.weight || 0);
-    }
+    for (const p of papers) totalWeight += (p.weight || 0);
     if (totalWeight <= 0) totalWeight = papers.length;
     for (const p of papers) {
       const pw = (p.weight || (100 / papers.length)) / totalWeight;
       let paperFinal = null;
+      const pFmS1 = p.fullMark;
+      const pFmS2 = (p.fullMarkS2 != null && !isNaN(p.fullMarkS2) && p.fullMarkS2 > 0) ? p.fullMarkS2 : p.fullMark;
       if (a.hasAdjustedPaper) {
         const pr = rec[p.id] || {};
-        if (pr.set1 != null && pr.set1 !== '') paperFinal = Math.min(parseFloat(pr.set1), p.fullMark);
+        if (pr.set1 != null && pr.set1 !== '') paperFinal = Math.min(parseFloat(pr.set1), pFmS1);
         else if (pr.set2 != null && pr.set2 !== '') {
-          const pPass = (p.fullMark * (pass / a.fullMark));
-          paperFinal = this._gradesApplyAdjusted(pr.set2, 2, mult, pPass, p.fullMark);
+          const pPass = (pFmS1 * (pass / a.fullMark));
+          paperFinal = this._gradesApplyAdjusted(pr.set2, 2, mult, pPass, pFmS1, pFmS2);
         }
       } else {
         const v = rec[p.id];
         if (v != null && v !== '') paperFinal = Math.min(parseFloat(v), p.fullMark);
       }
       if (paperFinal !== null) {
-        const pct = paperFinal / p.fullMark;
+        const pct = paperFinal / pFmS1;
         weightedSum += pct * pw * a.fullMark;
         hasAny = true;
       }
@@ -362,15 +430,30 @@ const GradesMethods = {
     return null;
   },
 
+  // ★ v14: Mouse enter handler – combined hover row tracking, drag selection extension, tooltip
   gradesOnCellMouseEnter(ev, ri, ci) {
+    // Track hover row (for highlighting student row)
+    this.gradesHoverRow = ri;
+
+    // Drag selection extension
+    if (this.gradesIsDragging && this.gradesDragStartCell) {
+      this.gradesSelStart = {
+        row: this.gradesDragStartCell.row,
+        col: this.gradesDragStartCell.col
+      };
+      this.gradesSelEnd = { row: ri, col: ci };
+    }
+
+    // Bonus tooltip (existing)
     const stu = this.gradesSortedStudents[ri];
     if (!stu) return;
     const tip = this.gradesGetBonusTooltip(stu.id, ci);
-    if (tip) {
+    if (tip && !this.gradesIsDragging) {
       const r = ev.currentTarget.getBoundingClientRect();
       this.scoringTooltip = { text: tip, x: r.left + r.width / 2, y: r.top - 8 };
     }
   },
+
   gradesOnCellMouseLeave() { this.scoringTooltip = null; },
 
   gradesCellClass(ri, ci, studentId) {
@@ -464,7 +547,7 @@ const GradesMethods = {
     if (!col) return;
     const a = col.assessment;
     const rect = event.currentTarget.getBoundingClientRect();
-    const pW = Math.min(320, window.innerWidth - 16), pH = 320;
+    const pW = Math.min(320, window.innerWidth - 16), pH = 380;
     let x, y;
     if (window.innerWidth < 640) { x = Math.max(8, (window.innerWidth - pW) / 2); y = Math.min(rect.bottom + 8, window.innerHeight - pH - 16); }
     else { x = rect.left + rect.width / 2 - pW / 2; y = rect.bottom + 8; }
@@ -473,9 +556,15 @@ const GradesMethods = {
     if (y + pH > window.innerHeight - 8) y = rect.top - pH - 8;
     if (y < 8) y = 8;
     this.gradesDetailPanel = { assessmentId: a.id, idx, x, y };
+
+    // ★ v14: Initialize Set 1/2 fullMark inline edit value when applicable
+    this.$nextTick(() => {
+      const info = this.gradesDetailPanelColInfo;
+      this.gradesDetailEditFullMark = info ? String(info.currentFullMark) : '';
+    });
   },
 
-  gradesCloseDetailPanel() { this.gradesDetailPanel = null; },
+  gradesCloseDetailPanel() { this.gradesDetailPanel = null; this.gradesDetailEditFullMark = ''; },
 
   gradesEditAssessmentFromDetail() {
     if (!this.gradesDetailPanel) return;
@@ -494,6 +583,8 @@ const GradesMethods = {
       hasAdjustedPaper: a.hasAdjustedPaper || false,
       adjustedMultiplier: a.adjustedMultiplier != null ? a.adjustedMultiplier : 80,
       passingScore: a.passingScore != null ? a.passingScore : 50,
+      // ★ v14: Carry fullMarkS2
+      fullMarkS2: a.fullMarkS2 != null ? a.fullMarkS2 : '',
       hasMultiplePapers: a.hasMultiplePapers || false,
       papers: a.hasMultiplePapers ? JSON.parse(JSON.stringify(a.papers || [])) : [],
       yearId: this.currentAcademicYearId,
@@ -508,6 +599,66 @@ const GradesMethods = {
     if (!a) return;
     this.gradesDetailPanel = null;
     this.openModal('deleteConfirm', { target:'assessment', yearId:this.currentAcademicYearId, classId:this.currentClassId, termId:this.gradesTermId, id:a.id, message:'確定要刪除「'+a.name+'」嗎？', submessage:'該項目的所有分數數據也將被刪除。' });
+  },
+
+  // ★ v14: Save the inline-edited Set fullMark and recompute totals
+  async gradesSaveSetFullMark() {
+    const info = this.gradesDetailPanelColInfo;
+    if (!info) return;
+    const newFm = parseFloat(this.gradesDetailEditFullMark);
+    if (isNaN(newFm) || newFm <= 0) {
+      this.addToast('請輸入有效的總分（>0）', 'warning');
+      return;
+    }
+    const a = this.gradesOrderedAssessments.find(x => x.id === info.assessmentId);
+    if (!a) return;
+    const updateData = {};
+
+    if (info.scope === 'exam') {
+      // Top-level adjusted exam (no multi-paper)
+      if (info.setKey === 's1') {
+        a.fullMark = newFm;
+        updateData.fullMark = newFm;
+      } else {
+        a.fullMarkS2 = newFm;
+        updateData.fullMarkS2 = newFm;
+      }
+      // Recompute every student's adjusted total
+      if (a.adjustedScores) {
+        for (const sid in a.adjustedScores) {
+          this._gradesRecomputeExamAdjustedTotal(a, sid);
+        }
+      }
+      updateData.scores = a.scores || {};
+    } else if (info.scope === 'paper') {
+      const paper = (a.papers || []).find(p => p.id === info.paperId);
+      if (!paper) return;
+      if (info.setKey === 's1') {
+        paper.fullMark = newFm;
+      } else {
+        paper.fullMarkS2 = newFm;
+      }
+      updateData.papers = a.papers;
+      if (a.paperScores) {
+        for (const sid in a.paperScores) {
+          this._gradesRecomputePaperTotal(a, sid);
+        }
+      }
+      updateData.scores = a.scores || {};
+    }
+
+    try {
+      await db.collection('academicYears').doc(this.currentAcademicYearId)
+        .collection('classes').doc(this.currentClassId)
+        .collection('terms').doc(this.gradesTermId)
+        .collection('assessments').doc(a.id)
+        .update(updateData);
+      this.addToast('已更新總分（已重新計算所有學生分數）', 'success');
+      this.gradesDetailPanel = null;
+      this.gradesDetailEditFullMark = '';
+    } catch (e) {
+      this.addToast('儲存失敗：' + e.message, 'error');
+    }
   },
 
   gradesPushUndo(entry) {
@@ -527,16 +678,20 @@ const GradesMethods = {
     this.addToast('已復原操作','success');
   },
 
+  // ★ v14: Smart copy – outputs only pure numeric values (no "10+2" formula, no "20*" asterisk)
   gradesHandleCopy(e) {
     e.preventDefault();
+    // Save any pending edit so the copied value reflects latest changes
+    this.gradesSaveCurrentCell();
     const bounds = this.gradesGetSelectionBounds();
     if (!bounds) return;
     const textRows = [];
     for (let r = bounds.minRow; r <= bounds.maxRow; r++) {
       const cols = [];
       for (let c = bounds.minCol; c <= bounds.maxCol; c++) {
-        if (r === this.gradesFocusRow && c === this.gradesFocusCol) cols.push(this.gradesEditValue || '');
-        else { const stu = this.gradesSortedStudents[r]; const val = stu ? this.gradesGetRawScoreForInput(stu.id, c) : ''; cols.push(val !== '' ? String(val) : ''); }
+        const stu = this.gradesSortedStudents[r];
+        const val = stu ? this.gradesGetCopyValue(stu.id, c) : '';
+        cols.push(val);
       }
       textRows.push(cols.join('\t'));
     }
@@ -680,6 +835,7 @@ const GradesMethods = {
       hasAdjustedPaper: a.hasAdjustedPaper || false,
       adjustedMultiplier: a.adjustedMultiplier != null ? a.adjustedMultiplier : 80,
       passingScore: a.passingScore != null ? a.passingScore : 50,
+      fullMarkS2: a.fullMarkS2 != null ? a.fullMarkS2 : '',
       hasMultiplePapers: a.hasMultiplePapers || false,
       papers: a.hasMultiplePapers ? JSON.parse(JSON.stringify(a.papers || [])) : [],
       yearId: this.currentAcademicYearId,
@@ -717,7 +873,13 @@ const GradesMethods = {
   gradesModalAddPaper() {
     if (!this.modalData.papers) this.modalData.papers = [];
     const n = this.modalData.papers.length + 1;
-    this.modalData.papers.push({ id: 'new_' + Date.now() + '_' + Math.random().toString(36).substr(2,4), name: '卷' + n, fullMark: 50, weight: 50 });
+    this.modalData.papers.push({
+      id: 'new_' + Date.now() + '_' + Math.random().toString(36).substr(2,4),
+      name: '卷' + n,
+      fullMark: 50,
+      fullMarkS2: '', // ★ v14
+      weight: 50
+    });
     const avg = Math.round(100 / this.modalData.papers.length);
     this.modalData.papers.forEach((p, i, arr) => { p.weight = i === arr.length - 1 ? 100 - avg * (arr.length - 1) : avg; });
   },
@@ -824,7 +986,14 @@ const GradesComputed = {
         let j = i;
         while (j < cols.length && cols[j].assessment.id === c.assessment.id && cols[j].paperId === c.paperId) j++;
         const paper = (c.assessment.papers || []).find(p => p.id === c.paperId);
-        result.push({ label: (paper ? paper.name : '卷') + ' (' + (paper ? paper.fullMark : '?') + ')', colspan: j - i, rowspan: 1, startCol: i, colSpec: c });
+        let lbl = paper ? paper.name : '卷';
+        if (paper) {
+          const fmS1 = paper.fullMark;
+          const fmS2 = (paper.fullMarkS2 != null && !isNaN(paper.fullMarkS2) && paper.fullMarkS2 > 0) ? paper.fullMarkS2 : null;
+          if (fmS2 && fmS2 !== fmS1) lbl += ' (S1:' + fmS1 + ' / S2:' + fmS2 + ')';
+          else lbl += ' (' + fmS1 + ')';
+        }
+        result.push({ label: lbl, colspan: j - i, rowspan: 1, startCol: i, colSpec: c });
         i = j;
       } else if (c.colType === 'paper' || c.colType === 'paper-total' || c.colType === 'exam-papers-total') {
         result.push({ label: c.label + (c.fullMark && c.colType === 'paper' ? ' (' + c.fullMark + ')' : ''), colspan: 1, rowspan: needsR4 ? 2 : 1, startCol: i, colSpec: c });
@@ -833,7 +1002,8 @@ const GradesComputed = {
         result.push({ label: c.label + (c.fullMark && c.colType === 'subitem' ? ' (' + c.fullMark + ')' : ''), colspan: 1, rowspan: needsR4 ? 2 : 1, startCol: i, colSpec: c });
         i++;
       } else if (c.colType === 'exam-set1' || c.colType === 'exam-set2') {
-        result.push({ label: c.colType === 'exam-set1' ? 'Set 1' : 'Set 2', colspan: 1, rowspan: needsR4 ? 2 : 1, startCol: i, colSpec: c });
+        const baseLabel = c.colType === 'exam-set1' ? 'Set 1' : 'Set 2';
+        result.push({ label: baseLabel + ' (' + c.fullMark + ')', colspan: 1, rowspan: needsR4 ? 2 : 1, startCol: i, colSpec: c });
         i++;
       } else if (c.colType === 'exam-adjusted-total') {
         result.push({ label: '總分', colspan: 1, rowspan: needsR4 ? 2 : 1, startCol: i, colSpec: c });
@@ -850,8 +1020,8 @@ const GradesComputed = {
     const cols = this.gradesOrderedColumns;
     const result = [];
     for (const c of cols) {
-      if (c.colType === 'paper-set1') result.push({ label: 'Set 1', colSpec: c });
-      else if (c.colType === 'paper-set2') result.push({ label: 'Set 2', colSpec: c });
+      if (c.colType === 'paper-set1') result.push({ label: 'Set 1 (' + c.fullMark + ')', colSpec: c });
+      else if (c.colType === 'paper-set2') result.push({ label: 'Set 2 (' + c.fullMark + ')', colSpec: c });
     }
     return result;
   },
@@ -910,6 +1080,44 @@ const GradesComputed = {
   },
   gradesDetailAssessment() { if (!this.gradesDetailPanel) return null; return this.gradesOrderedAssessments.find(a => a.id === this.gradesDetailPanel.assessmentId) || null; },
   gradesDetailPanelStyle() { if (!this.gradesDetailPanel) return {}; const w=Math.min(320,window.innerWidth-16); return { position:'fixed', top:this.gradesDetailPanel.y+'px', left:this.gradesDetailPanel.x+'px', zIndex:9999, width:w+'px' }; },
+
+  // ★ v14: Returns info for the Set 1/Set 2 column being viewed (null otherwise)
+  gradesDetailPanelColInfo() {
+    if (!this.gradesDetailPanel) return null;
+    const col = this.gradesOrderedColumns[this.gradesDetailPanel.idx];
+    if (!col) return null;
+    if (col.colType === 'exam-set1' || col.colType === 'exam-set2') {
+      const isS1 = col.colType === 'exam-set1';
+      const a = col.assessment;
+      const cur = isS1 ? a.fullMark : ((a.fullMarkS2 != null && !isNaN(a.fullMarkS2)) ? a.fullMarkS2 : a.fullMark);
+      return {
+        scope: 'exam',
+        setKey: isS1 ? 's1' : 's2',
+        setLabel: isS1 ? 'Set 1（正常卷）' : 'Set 2（調適卷）',
+        currentFullMark: cur,
+        assessmentId: a.id,
+        paperName: null
+      };
+    }
+    if (col.colType === 'paper-set1' || col.colType === 'paper-set2') {
+      const isS1 = col.colType === 'paper-set1';
+      const a = col.assessment;
+      const paper = (a.papers || []).find(p => p.id === col.paperId);
+      if (!paper) return null;
+      const cur = isS1 ? paper.fullMark : ((paper.fullMarkS2 != null && !isNaN(paper.fullMarkS2)) ? paper.fullMarkS2 : paper.fullMark);
+      return {
+        scope: 'paper',
+        setKey: isS1 ? 's1' : 's2',
+        setLabel: isS1 ? 'Set 1（正常卷）' : 'Set 2（調適卷）',
+        currentFullMark: cur,
+        assessmentId: a.id,
+        paperId: paper.id,
+        paperName: paper.name
+      };
+    }
+    return null;
+  },
+
   gradesAutoFailPercent() {
     if (!this.currentClass) return 50;
     if (this.currentClass.classType === 'elective') return 40;
@@ -959,8 +1167,11 @@ GradesMethods._buildColumnsForAssessment = function(a) {
     if (hasMulti) {
       for (const p of a.papers) {
         if (hasAdj) {
-          cols.push({ colKey: a.id + '-p-' + p.id + '-s1', assessment: a, paperId: p.id, colType: 'paper-set1', label: 'Set 1', fullMark: p.fullMark, readOnly: false });
-          cols.push({ colKey: a.id + '-p-' + p.id + '-s2', assessment: a, paperId: p.id, colType: 'paper-set2', label: 'Set 2', fullMark: p.fullMark, readOnly: false });
+          // ★ v14: Per-paper independent fullMarks for Set 1 and Set 2
+          const pFmS1 = p.fullMark;
+          const pFmS2 = (p.fullMarkS2 != null && !isNaN(p.fullMarkS2) && p.fullMarkS2 > 0) ? p.fullMarkS2 : p.fullMark;
+          cols.push({ colKey: a.id + '-p-' + p.id + '-s1', assessment: a, paperId: p.id, colType: 'paper-set1', label: 'Set 1', fullMark: pFmS1, readOnly: false });
+          cols.push({ colKey: a.id + '-p-' + p.id + '-s2', assessment: a, paperId: p.id, colType: 'paper-set2', label: 'Set 2', fullMark: pFmS2, readOnly: false });
         } else {
           cols.push({ colKey: a.id + '-p-' + p.id, assessment: a, paperId: p.id, colType: 'paper', label: p.name, fullMark: p.fullMark, readOnly: false });
         }
@@ -969,9 +1180,12 @@ GradesMethods._buildColumnsForAssessment = function(a) {
       return cols;
     }
     if (hasAdj) {
-      cols.push({ colKey: a.id + '-s1', assessment: a, colType: 'exam-set1', label: 'Set 1', fullMark: a.fullMark, readOnly: false });
-      cols.push({ colKey: a.id + '-s2', assessment: a, colType: 'exam-set2', label: 'Set 2', fullMark: a.fullMark, readOnly: false });
-      cols.push({ colKey: a.id + '-atotal', assessment: a, colType: 'exam-adjusted-total', label: '總分', fullMark: a.fullMark, readOnly: true });
+      // ★ v14: Independent fullMarks for Set 1 (= a.fullMark) and Set 2 (= a.fullMarkS2)
+      const fmS1 = a.fullMark;
+      const fmS2 = (a.fullMarkS2 != null && !isNaN(a.fullMarkS2) && a.fullMarkS2 > 0) ? a.fullMarkS2 : a.fullMark;
+      cols.push({ colKey: a.id + '-s1', assessment: a, colType: 'exam-set1', label: 'Set 1', fullMark: fmS1, readOnly: false });
+      cols.push({ colKey: a.id + '-s2', assessment: a, colType: 'exam-set2', label: 'Set 2', fullMark: fmS2, readOnly: false });
+      cols.push({ colKey: a.id + '-atotal', assessment: a, colType: 'exam-adjusted-total', label: '總分', fullMark: fmS1, readOnly: true });
       return cols;
     }
   }
