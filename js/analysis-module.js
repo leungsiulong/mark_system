@@ -1,8 +1,7 @@
 // ================================================================
-// Analysis Module (v1 — class/student/cross-year analysis with Chart.js)
+// Analysis Module (v2 — per-assessment ranking, collapsible assignment group)
 // ================================================================
 const AnalysisMethods = {
-  // ---------- Tab / state ----------
   analysisSetTab(tab) {
     this.analysisSubTab = tab;
     this.$nextTick(() => setTimeout(() => this.analysisRenderAllCharts(), 80));
@@ -23,7 +22,11 @@ const AnalysisMethods = {
 
   analysisSortStudentScores(key) {
     if (this.analysisStudentSortKey === key) this.analysisStudentSortAsc = !this.analysisStudentSortAsc;
-    else { this.analysisStudentSortKey = key; this.analysisStudentSortAsc = (key !== 'diff'); }
+    else {
+      this.analysisStudentSortKey = key;
+      // For 'rank' / 'studentNumber' default ascending; for 'diff' default descending
+      this.analysisStudentSortAsc = (key === 'rank' || key === 'studentNumber') ? true : (key !== 'diff');
+    }
   },
 
   analysisSelectStudent(sid) {
@@ -348,7 +351,6 @@ const AnalysisMethods = {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   },
 
-  // Cross-year calculation using class's own scoreConfig
   _analysisComputeForClass(cls, stu) {
     if (!cls || !stu) return { t1a3: null, t1Exam: null, t2a3: null, t2Exam: null, yearlyTotal: null };
     const sc = cls.scoreConfig || {};
@@ -504,7 +506,6 @@ const AnalysisComputed = {
         return asc ? va - vb : vb - va;
       });
     }
-    // Semester summary
     const examScores = [];
     for (const s of students) {
       const r3 = this.scoringCalcA3(s.id, this.gradesTerm);
@@ -528,6 +529,28 @@ const AnalysisComputed = {
       };
     }
     return { rows, semester };
+  },
+
+  // ★ v15: Number of assignment rows (used by collapsible header)
+  analysisAssignmentRowsCount() {
+    return (this.analysisClassOverviewData.rows || []).filter(r => r.type === 'assignment').length;
+  },
+
+  // ★ v15: Filtered visible rows respecting collapsed assignment state
+  analysisClassOverviewVisibleRows() {
+    const rows = this.analysisClassOverviewData.rows || [];
+    if (!this.analysisOverviewAssignmentCollapsed) return rows;
+    return rows.filter(r => r.type !== 'assignment');
+  },
+
+  // ★ v15: Quick aggregate stats for the collapsed assignment header
+  analysisAssignmentAggregateInfo() {
+    const rows = (this.analysisClassOverviewData.rows || []).filter(r => r.type === 'assignment');
+    if (!rows.length) return null;
+    const avgs = rows.map(r => r.avg).filter(v => v !== null);
+    if (!avgs.length) return { avgOfAvgs: null, count: rows.length };
+    const sum = avgs.reduce((a, b) => a + b, 0);
+    return { avgOfAvgs: sum / avgs.length, count: rows.length };
   },
 
   analysisDistributionOptions() {
@@ -747,6 +770,7 @@ const AnalysisComputed = {
     };
   },
 
+  // ★ v15: Now includes per-assessment rank for the selected student
   analysisStudentScoresTable() {
     const s = this.analysisSelectedStudent;
     if (!s || !this.currentClass) return [];
@@ -756,17 +780,35 @@ const AnalysisComputed = {
       for (const a of (term.assessments || [])) {
         const stuV = this._getEffScore(a, s.id);
         const stuPct = stuV !== null ? stuV / a.fullMark * 100 : null;
-        const vals = [];
+        const allScores = [];
+        const pctVals = [];
         for (const stu of this.currentStudents) {
           const v = this._getEffScore(a, stu.id);
-          if (v !== null) vals.push(v / a.fullMark * 100);
+          if (v !== null) {
+            pctVals.push(v / a.fullMark * 100);
+            allScores.push({ id: stu.id, value: v });
+          }
         }
-        const classPct = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+        const classPct = pctVals.length ? pctVals.reduce((x, y) => x + y, 0) / pctVals.length : null;
+
+        // Per-assessment rank
+        let rank = null;
+        const totalRanked = allScores.length;
+        if (stuV !== null && allScores.length > 0) {
+          allScores.sort((x, y) => y.value - x.value);
+          let lv = null, lr = 0;
+          for (let i = 0; i < allScores.length; i++) {
+            if (allScores[i].value !== lv) { lr = i + 1; lv = allScores[i].value; }
+            if (allScores[i].id === s.id) { rank = lr; break; }
+          }
+        }
+
         rows.push({
           id: a.id, name: a.name, type: a.type, typeLabel: this.assessmentLabel(a.type),
           fullMark: a.fullMark, termName: term.name,
           studentScore: stuV, studentPct: stuPct, classAvgPct: classPct,
-          diff: (stuPct !== null && classPct !== null) ? stuPct - classPct : null
+          diff: (stuPct !== null && classPct !== null) ? stuPct - classPct : null,
+          rank, totalRanked
         });
       }
     }
@@ -931,7 +973,6 @@ const AnalysisComputed = {
       if (!cls) continue;
       const stu = cls.students.find(s => s.globalStudentId === gs.id);
       if (!stu) continue;
-      // Skip base regular classes (no terms / no grades)
       if (cls.classType === 'regular' && (!cls.terms || cls.terms.length === 0)) continue;
       const snap = this._analysisComputeForClass(cls, stu);
       let yearlyRank = null;

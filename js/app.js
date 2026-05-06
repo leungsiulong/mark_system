@@ -1,5 +1,6 @@
 // ================================================================
-// Main Application (v14 — name templates, hover highlight, drag select, set fullMarks)
+// Main Application (v16 — robust drag-out protection for detail panel,
+//                         uncapped ranking integration)
 // ================================================================
 const { createApp } = Vue;
 
@@ -12,7 +13,6 @@ createApp({
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
       leftPanelOpen: true, expandedYears: {},
 
-      // ★ v14: Name templates
       nameTemplates: ['工作紙', '默寫', '單元測試', '聆聽測驗', '說話練習', '閱讀理解', '寫作'],
       newNameTemplate: '',
 
@@ -44,12 +44,11 @@ createApp({
       gradesSelStart: null, gradesSelEnd: null,
       gradesHighlightUnenteredCol: -1,
       gradesShowFailHighlight: true, gradesFailPercent: null,
-      // ★ v14: Hover highlighting + drag selection state
       gradesHoverRow: -1,
       gradesIsDragging: false,
       gradesDragStartCell: null,
-      // ★ v14: Inline Set 1/2 fullMark editing in detail panel
       gradesDetailEditFullMark: '',
+      gradesDisplayMode: 'raw',
       gradesStatRows: [
         { key:'avg', label:'平均' }, { key:'max', label:'最高' }, { key:'min', label:'最低' },
         { key:'median', label:'中位數' }, { key:'stddev', label:'標準差' }, { key:'count', label:'已輸入' }
@@ -83,7 +82,8 @@ createApp({
       analysisRankingSortKey: 'yearlyRank',
       analysisRankingSortAsc: true,
       analysisStudentSortKey: 'diff',
-      analysisStudentSortAsc: false
+      analysisStudentSortAsc: false,
+      analysisOverviewAssignmentCollapsed: true
     };
   },
 
@@ -270,11 +270,13 @@ createApp({
       this.analysisStudentId = null;
       this.analysisTrendSelectedStudents = [];
       this.analysisDistributionKey = null;
+      this.analysisOverviewAssignmentCollapsed = true;
       this.$nextTick(() => {
         if (this.currentView === 'analysis') setTimeout(() => this.analysisRenderAllCharts(), 80);
       });
     },
     gradesTermId() {
+      this.analysisOverviewAssignmentCollapsed = true;
       this.$nextTick(() => {
         if (this.currentView === 'analysis') setTimeout(() => this.analysisRenderAllCharts(), 80);
       });
@@ -453,11 +455,8 @@ createApp({
     moveQuickNavDown(idx) { if(idx>=this.activeQuickNavKeys.length-1)return;const a=[...this.activeQuickNavKeys];[a[idx],a[idx+1]]=[a[idx+1],a[idx]];this.activeQuickNavKeys=a;this.saveQuickNavSettings(); },
     async saveQuickNavSettings() { try{await db.collection('settings').doc('main').set({activeQuickNavKeys:this.activeQuickNavKeys},{merge:true});}catch(e){console.error(e);} },
 
-    // ★ v14: Name template management
     insertNameTemplate(tpl) {
-      // Append to current name (allows combining multiple templates or continuing to type after)
       this.modalData.name = (this.modalData.name || '') + tpl;
-      // Focus the name input and place cursor at end
       this.$nextTick(() => {
         const inputs = document.querySelectorAll('input[name="assessmentName"]');
         if (inputs.length > 0) {
@@ -578,6 +577,10 @@ createApp({
       this.openModal('deleteConfirm', { target:'customCategory', id:cat.id, yearId:this.currentAcademicYearId, classId:this.currentClassId, message:'確定要刪除類別「'+cat.name+'」嗎？', submessage:'此類別下的所有評估項目及成績數據都將被刪除。' });
     },
 
+    analysisToggleAssignmentCollapse() {
+      this.analysisOverviewAssignmentCollapsed = !this.analysisOverviewAssignmentCollapsed;
+    },
+
     _injectCustomStyles() {
       const style = document.createElement('style'); style.id = 'app-injected-styles';
       style.textContent = `
@@ -585,14 +588,33 @@ createApp({
         .grades-cell.cell-focused{overflow:visible!important}
         .grades-cell.cell-readonly{background:#fafaf9!important;color:#78716c;font-weight:600;cursor:default}
         .grades-cell.cell-bonus{background:#e6e4df!important;color:#6b6964;font-weight:600}
-        .grades-cell.cell-bonus.cell-focused{background:#d1cdc4!important}
-        .grades-cell input{position:absolute!important;top:-1px!important;left:-1px!important;width:calc(100% + 2px)!important;height:calc(100% + 2px)!important;box-sizing:border-box!important;margin:0!important;padding:0 4px!important;border:2px solid #3b82f6!important;border-radius:1px!important;outline:none!important;background:#fff!important;text-align:center!important;font-size:inherit!important;font-family:inherit!important;line-height:inherit!important;z-index:5!important;min-width:0!important;max-width:none!important}
-        .grades-cell input:focus{border-color:#2563eb!important;box-shadow:0 0 0 1px rgba(37,99,235,.2)!important}
-        /* ★ v14: Hover row highlighting on frozen columns */
+        .grades-cell input{
+          position:absolute!important;
+          top:0!important;
+          left:0!important;
+          width:100%!important;
+          height:100%!important;
+          box-sizing:border-box!important;
+          margin:0!important;
+          padding:0 4px!important;
+          border:none!important;
+          outline:none!important;
+          background:transparent!important;
+          color:inherit!important;
+          text-align:center!important;
+          font-size:inherit!important;
+          font-family:inherit!important;
+          font-weight:inherit!important;
+          line-height:inherit!important;
+          z-index:5!important;
+          min-width:0!important;
+          max-width:none!important;
+        }
+        .grades-cell input:focus{outline:none!important;border:none!important;box-shadow:none!important;}
+        .grades-cell input::selection{background:rgba(59,130,246,0.25)}
         .grades-table tr.row-hover-highlight .frozen-sn,
         .grades-table tr.row-hover-highlight .frozen-name,
         .grades-table tr.row-hover-highlight .frozen-class { background:#eff6ff !important; transition: background-color .12s }
-        /* Prevent text selection during drag */
         .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
       `;
       document.head.appendChild(style);
@@ -612,21 +634,59 @@ createApp({
         if(this.showModal) this.closeModal();
       }
     });
-    document.addEventListener('click',()=>{
-      this.gradesCPMenuOpen=false;
-      this.gradesCustomMenuOpen=false;
-      this.gradesHeaderMenu=null;
-      this.gradesDetailPanel=null;
-      this.scoringCopyMenuOpen=false;
-      this.scoringTooltip=null;
-    });
-    // ★ v14: Document-level mouseup ends drag selection regardless of where mouse is released
-    document.addEventListener('mouseup', () => {
+
+    // ★ v16: Robust drag-out protection — track BOTH mousedown and mouseup positions.
+    // Detail panel will close ONLY if BOTH press AND release happened outside the panel.
+    // Cases handled:
+    //   • Press inside,  release inside  → both inside  → don't close (normal panel interaction)
+    //   • Press inside,  release outside → press inside → don't close (drag-out scenario) ★
+    //   • Press outside, release inside  → up inside    → don't close (drag-in scenario)
+    //   • Press outside, release outside → both outside → CLOSE (normal outside click) ✓
+    this._panelMousedownInside = false;
+    this._panelMouseupInside = false;
+
+    const _checkInsidePanel = (target) => {
+      try {
+        let t = target;
+        if (t && t.nodeType === 3) t = t.parentNode; // normalize text node → parent element
+        if (t && typeof t.closest === 'function') {
+          return !!t.closest('.detail-panel');
+        }
+      } catch (err) { /* ignore */ }
+      return false;
+    };
+
+    // mousedown — capture phase so it fires before any @mousedown.stop in bubble phase
+    document.addEventListener('mousedown', (e) => {
+      this._panelMousedownInside = _checkInsidePanel(e && e.target);
+    }, true);
+
+    // mouseup — capture phase as well, also resets gradesIsDragging state
+    document.addEventListener('mouseup', (e) => {
+      this._panelMouseupInside = _checkInsidePanel(e && e.target);
       if (this.gradesIsDragging) {
         this.gradesIsDragging = false;
         this.gradesDragStartCell = null;
       }
+    }, true);
+
+    document.addEventListener('click', () => {
+      this.gradesCPMenuOpen = false;
+      this.gradesCustomMenuOpen = false;
+      this.gradesHeaderMenu = null;
+      this.scoringCopyMenuOpen = false;
+      this.scoringTooltip = null;
+      // ★ v16: Only close detail panel if BOTH mousedown AND mouseup were OUTSIDE
+      if (this.gradesDetailPanel) {
+        if (!this._panelMousedownInside && !this._panelMouseupInside) {
+          this.gradesDetailPanel = null;
+        }
+      }
+      // Reset both flags for the next interaction
+      this._panelMousedownInside = false;
+      this._panelMouseupInside = false;
     });
+
     this.$watch(()=>this.modalData.studentName,(nv)=>{
       if(this.modalType==='addStudent'&&nv&&nv.trim().length>0){const m=this.globalStudents.find(g=>g.name===nv.trim());this.modalData.matchedGlobal=m||null;if(!m)this.modalData.linkToGlobal=false;}
     });

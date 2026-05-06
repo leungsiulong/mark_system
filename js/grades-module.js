@@ -1,5 +1,6 @@
 // ================================================================
-// Grades Module (v10 — drag select, smart copy, hover highlight, set fullMarkS2)
+// Grades Module (v12 — uncapped ranking & stats so bonus scores rank correctly,
+//                       e.g. 110/100 ranks higher than 105/100)
 // ================================================================
 
 const GradesMethods = {
@@ -64,10 +65,8 @@ const GradesMethods = {
     });
   },
 
-  // ★ v14: Mouse down handler – initiates drag selection or shift+click extend
   gradesOnCellMouseDown(ri, ci, ev) {
-    if (ev.button !== 0) return; // left click only
-    // If clicking inside the active edit input, let the input handle it natively
+    if (ev.button !== 0) return;
     if (this.gradesFocusRow === ri && this.gradesFocusCol === ci && ev.target && ev.target.tagName === 'INPUT') {
       return;
     }
@@ -75,19 +74,16 @@ const GradesMethods = {
     const col = this.gradesOrderedColumns[ci];
     if (!col) return;
 
-    // Shift+click: extend selection from current focus to clicked cell (no drag)
     if (ev.shiftKey && this.gradesFocusRow >= 0 && this.gradesFocusCol >= 0) {
       this.gradesSelStart = { row: this.gradesFocusRow, col: this.gradesFocusCol };
       this.gradesSelEnd = { row: ri, col: ci };
       return;
     }
 
-    // Initiate drag selection
     this.gradesIsDragging = true;
     this.gradesDragStartCell = { row: ri, col: ci };
 
     if (col.readOnly) {
-      // For readonly cells: clear focus, set selection only
       this.gradesSaveCurrentCell();
       this.gradesFocusRow = -1; this.gradesFocusCol = -1;
       this.gradesEditValue = ''; this.gradesCellOriginalValue = '';
@@ -165,20 +161,17 @@ const GradesMethods = {
     return '';
   },
 
-  // ★ v14: Returns the pure numeric value for clipboard (no formula, no asterisk)
   gradesGetCopyValue(studentId, ci) {
     const col = this.gradesOrderedColumns[ci];
     if (!col) return '';
     const a = col.assessment;
 
-    // Simple cells (assignment, quiz, etc.) – use effective (capped) value
     if (col.colType === 'simple') {
       const eff = this._getEffScore(a, studentId);
       if (eff === null || eff === undefined) return '';
       return Number.isInteger(eff) ? String(eff) : parseFloat(eff).toFixed(1);
     }
 
-    // Read-only computed totals – return the computed score directly
     if (col.colType === 'subitem-total' || col.colType === 'exam-adjusted-total' ||
         col.colType === 'paper-total' || col.colType === 'exam-papers-total') {
       const v = (a.scores || {})[studentId];
@@ -186,9 +179,89 @@ const GradesMethods = {
       return Number.isInteger(v) ? String(v) : parseFloat(v).toFixed(1);
     }
 
-    // Sub-item / paper / set1 / set2 inputs – return raw numeric input
     const raw = this.gradesGetRawScoreForInput(studentId, ci);
     return raw === '' || raw == null ? '' : String(raw);
+  },
+
+  // ★ v16: Returns the UNCAPPED numeric value of a cell, used for ranking and
+  // percent display. For `simple` columns with bonus, this includes the bonus
+  // beyond fullMark, so e.g. 110/100 correctly outranks 105/100.
+  gradesGetEffectiveValueForRanking(studentId, ci) {
+    const col = this.gradesOrderedColumns[ci];
+    if (!col) return null;
+    const a = col.assessment;
+
+    if (col.colType === 'simple') {
+      // ★ v16: NO CAPPING — bonus and over-fullmark scores rank correctly
+      const v = (a.scores || {})[studentId];
+      if (v == null) return null;
+      if (typeof v === 'object' && v !== null) {
+        return (v.base || 0) + (v.bonus || 0);
+      }
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    }
+    if (col.colType === 'subitem') {
+      const v = ((a.subItemScores || {})[studentId] || {})[col.subItemId];
+      if (v == null || v === '') return null;
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    }
+    if (col.colType === 'subitem-total' || col.colType === 'exam-adjusted-total' ||
+        col.colType === 'paper-total' || col.colType === 'exam-papers-total') {
+      // For computed totals (sub-items, adjusted exam, papers), use the stored
+      // value as-is. These are already capped during their own computation.
+      const v = (a.scores || {})[studentId];
+      if (v == null) return null;
+      if (typeof v === 'object') {
+        return (v.base || 0) + (v.bonus || 0);
+      }
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    }
+    if (col.colType === 'exam-set1' || col.colType === 'exam-set2') {
+      const rec = (a.adjustedScores || {})[studentId] || {};
+      const k = col.colType === 'exam-set1' ? 'set1' : 'set2';
+      if (rec[k] == null || rec[k] === '') return null;
+      const n = parseFloat(rec[k]);
+      return isNaN(n) ? null : n;
+    }
+    if (col.colType === 'paper') {
+      const v = ((a.paperScores || {})[studentId] || {})[col.paperId];
+      if (v == null) return null;
+      if (typeof v === 'object') return null;
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    }
+    if (col.colType === 'paper-set1' || col.colType === 'paper-set2') {
+      const rec = ((a.paperScores || {})[studentId] || {})[col.paperId] || {};
+      const k = col.colType === 'paper-set1' ? 'set1' : 'set2';
+      if (rec[k] == null || rec[k] === '') return null;
+      const n = parseFloat(rec[k]);
+      return isNaN(n) ? null : n;
+    }
+    return null;
+  },
+
+  gradesGetCellDisplayText(studentId, ci) {
+    const mode = this.gradesDisplayMode || 'raw';
+    if (mode === 'rank') {
+      const ranks = this.gradesAllColumnRanks ? this.gradesAllColumnRanks[ci] : null;
+      if (!ranks) return '';
+      const rank = ranks.get(studentId);
+      return rank != null ? rank : '';
+    }
+    if (mode === 'percent') {
+      const col = this.gradesOrderedColumns[ci];
+      if (!col || !col.fullMark || col.fullMark <= 0) {
+        return this.gradesGetDisplayScore(studentId, ci);
+      }
+      // ★ v16: Uses uncapped value, so 110/100 displays as 110.0%
+      const v = this.gradesGetEffectiveValueForRanking(studentId, ci);
+      if (v === null || v === undefined || isNaN(v)) return '';
+      return ((v / col.fullMark) * 100).toFixed(1);
+    }
+    return this.gradesGetDisplayScore(studentId, ci);
   },
 
   gradesWriteCell(row, col, value) {
@@ -255,17 +328,14 @@ const GradesMethods = {
     else delete a.scores[sid];
   },
 
-  // ★ v14: Updated signature to accept independent fullMark for Set 1 and Set 2
-  // Behavior: Set 2 raw score is converted to Set 1 scale via ratio, then multiplier and cap applied.
-  // Backward compatible: when fullMarkS2 omitted/null, defaults to fullMarkS1 → identical to original logic.
   _gradesApplyAdjusted(setVal, set, multiplier, passingScore, fullMarkS1, fullMarkS2) {
     if (setVal == null) return null;
     const v = parseFloat(setVal);
     if (isNaN(v)) return null;
     if (set === 1) return Math.min(v, fullMarkS1);
     const fmS2 = (fullMarkS2 != null && !isNaN(fullMarkS2) && fullMarkS2 > 0) ? fullMarkS2 : fullMarkS1;
-    const inSet1Scale = (v / fmS2) * fullMarkS1;       // convert to S1 scale
-    const adj = inSet1Scale * (multiplier / 100);      // apply multiplier
+    const inSet1Scale = (v / fmS2) * fullMarkS1;
+    const adj = inSet1Scale * (multiplier / 100);
     const cap = passingScore != null ? passingScore : fullMarkS1;
     return Math.min(adj, cap, fullMarkS1);
   },
@@ -430,12 +500,8 @@ const GradesMethods = {
     return null;
   },
 
-  // ★ v14: Mouse enter handler – combined hover row tracking, drag selection extension, tooltip
   gradesOnCellMouseEnter(ev, ri, ci) {
-    // Track hover row (for highlighting student row)
     this.gradesHoverRow = ri;
-
-    // Drag selection extension
     if (this.gradesIsDragging && this.gradesDragStartCell) {
       this.gradesSelStart = {
         row: this.gradesDragStartCell.row,
@@ -443,8 +509,6 @@ const GradesMethods = {
       };
       this.gradesSelEnd = { row: ri, col: ci };
     }
-
-    // Bonus tooltip (existing)
     const stu = this.gradesSortedStudents[ri];
     if (!stu) return;
     const tip = this.gradesGetBonusTooltip(stu.id, ci);
@@ -540,6 +604,12 @@ const GradesMethods = {
     else { const n = parseFloat(val); this.gradesFailPercent = isNaN(n) ? null : n; }
   },
 
+  gradesSetDisplayMode(mode) {
+    if (['raw','percent','rank'].indexOf(mode) >= 0) {
+      this.gradesDisplayMode = mode;
+    }
+  },
+
   gradesShowAssessmentDetail(idx, event) {
     if (!event) return;
     event.stopPropagation();
@@ -557,7 +627,6 @@ const GradesMethods = {
     if (y < 8) y = 8;
     this.gradesDetailPanel = { assessmentId: a.id, idx, x, y };
 
-    // ★ v14: Initialize Set 1/2 fullMark inline edit value when applicable
     this.$nextTick(() => {
       const info = this.gradesDetailPanelColInfo;
       this.gradesDetailEditFullMark = info ? String(info.currentFullMark) : '';
@@ -583,7 +652,6 @@ const GradesMethods = {
       hasAdjustedPaper: a.hasAdjustedPaper || false,
       adjustedMultiplier: a.adjustedMultiplier != null ? a.adjustedMultiplier : 80,
       passingScore: a.passingScore != null ? a.passingScore : 50,
-      // ★ v14: Carry fullMarkS2
       fullMarkS2: a.fullMarkS2 != null ? a.fullMarkS2 : '',
       hasMultiplePapers: a.hasMultiplePapers || false,
       papers: a.hasMultiplePapers ? JSON.parse(JSON.stringify(a.papers || [])) : [],
@@ -601,7 +669,6 @@ const GradesMethods = {
     this.openModal('deleteConfirm', { target:'assessment', yearId:this.currentAcademicYearId, classId:this.currentClassId, termId:this.gradesTermId, id:a.id, message:'確定要刪除「'+a.name+'」嗎？', submessage:'該項目的所有分數數據也將被刪除。' });
   },
 
-  // ★ v14: Save the inline-edited Set fullMark and recompute totals
   async gradesSaveSetFullMark() {
     const info = this.gradesDetailPanelColInfo;
     if (!info) return;
@@ -615,7 +682,6 @@ const GradesMethods = {
     const updateData = {};
 
     if (info.scope === 'exam') {
-      // Top-level adjusted exam (no multi-paper)
       if (info.setKey === 's1') {
         a.fullMark = newFm;
         updateData.fullMark = newFm;
@@ -623,7 +689,6 @@ const GradesMethods = {
         a.fullMarkS2 = newFm;
         updateData.fullMarkS2 = newFm;
       }
-      // Recompute every student's adjusted total
       if (a.adjustedScores) {
         for (const sid in a.adjustedScores) {
           this._gradesRecomputeExamAdjustedTotal(a, sid);
@@ -678,10 +743,8 @@ const GradesMethods = {
     this.addToast('已復原操作','success');
   },
 
-  // ★ v14: Smart copy – outputs only pure numeric values (no "10+2" formula, no "20*" asterisk)
   gradesHandleCopy(e) {
     e.preventDefault();
-    // Save any pending edit so the copied value reflects latest changes
     this.gradesSaveCurrentCell();
     const bounds = this.gradesGetSelectionBounds();
     if (!bounds) return;
@@ -877,7 +940,7 @@ const GradesMethods = {
       id: 'new_' + Date.now() + '_' + Math.random().toString(36).substr(2,4),
       name: '卷' + n,
       fullMark: 50,
-      fullMarkS2: '', // ★ v14
+      fullMarkS2: '',
       weight: 50
     });
     const avg = Math.round(100 / this.modalData.papers.length);
@@ -1046,42 +1109,101 @@ const GradesComputed = {
     return arr;
   },
 
+  // ★ v16: Compute ranks for every column using UNCAPPED values (via
+  // gradesGetEffectiveValueForRanking). When several students exceed the
+  // full mark (e.g. due to bonus), they no longer all tie at #1 — instead
+  // they're ranked by their actual (uncapped) score, so 110 > 105 > 100.
+  gradesAllColumnRanks() {
+    const cols = this.gradesOrderedColumns;
+    const stu = this.gradesSortedStudents;
+    const result = [];
+    for (let ci = 0; ci < cols.length; ci++) {
+      const scores = [];
+      for (const s of stu) {
+        const v = this.gradesGetEffectiveValueForRanking(s.id, ci);
+        if (v !== null && !isNaN(v)) scores.push({ id: s.id, value: v });
+      }
+      scores.sort((a, b) => b.value - a.value);
+      const ranks = new Map();
+      let lastValue = null, lastRank = 0;
+      scores.forEach((x, i) => {
+        if (x.value !== lastValue) { lastRank = i + 1; lastValue = x.value; }
+        ranks.set(x.id, lastRank);
+      });
+      result.push(ranks);
+    }
+    return result;
+  },
+
+  gradesDisplayModeIdx() {
+    return { raw: 0, percent: 1, rank: 2 }[this.gradesDisplayMode] || 0;
+  },
+
+  // ★ v16: Stats now also use UNCAPPED values for `simple` columns, so the
+  // max stat correctly reflects bonus-inflated scores (e.g. shows 110 when
+  // a student got 110/100). This is consistent with the ranking change above.
   gradesStatsData() {
     const cols = this.gradesOrderedColumns;
     const stu = this.gradesSortedStudents;
     const total = stu.length;
     const result = [];
+    const mode = this.gradesDisplayMode || 'raw';
+
     for (let ci = 0; ci < cols.length; ci++) {
       const col = cols[ci];
-      const vals = [];
+
+      if (mode === 'rank') {
+        const ranks = this.gradesAllColumnRanks ? this.gradesAllColumnRanks[ci] : null;
+        const cnt = ranks ? ranks.size : 0;
+        result.push({ avg: '—', max: '—', min: '—', median: '—', stddev: '—', count: cnt + '/' + total });
+        continue;
+      }
+
+      const rawVals = [];
       for (const s of stu) {
         const disp = this.gradesGetDisplayScore(s.id, ci);
         if (disp === '' || disp == null) continue;
         let n;
         if (col.colType === 'simple') {
           const rawV = (col.assessment.scores || {})[s.id];
-          if (typeof rawV === 'object' && rawV !== null) n = Math.min((rawV.base||0)+(rawV.bonus||0), col.fullMark);
-          else n = Math.min(parseFloat(rawV), col.fullMark);
+          // ★ v16: UNCAPPED — bonus contributes to averages and max/median
+          if (typeof rawV === 'object' && rawV !== null) n = (rawV.base||0)+(rawV.bonus||0);
+          else n = parseFloat(rawV);
         } else {
           n = parseFloat(String(disp).replace('*',''));
         }
-        if (!isNaN(n)) vals.push(n);
+        if (!isNaN(n)) rawVals.push(n);
       }
-      if (!vals.length) { result.push({ avg:'—', max:'—', min:'—', median:'—', stddev:'—', count:'0/'+total }); continue; }
+      if (!rawVals.length) {
+        result.push({ avg:'—', max:'—', min:'—', median:'—', stddev:'—', count:'0/'+total });
+        continue;
+      }
+      const isPercent = mode === 'percent' && col.fullMark > 0;
+      const vals = isPercent ? rawVals.map(v => (v / col.fullMark) * 100) : rawVals;
       const sum = vals.reduce((a,b)=>a+b,0);
       const mean = sum/vals.length;
       const sorted = [...vals].sort((a,b)=>a-b);
       const mid = Math.floor(sorted.length/2);
-      const med = sorted.length%2 ? String(sorted[mid]) : ((sorted[mid-1]+sorted[mid])/2).toFixed(1);
+      const med = sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
       const variance = vals.reduce((acc,v)=>acc+Math.pow(v-mean,2),0)/vals.length;
-      result.push({ avg:mean.toFixed(1), max:String(Math.max(...vals)), min:String(Math.min(...vals)), median:String(med), stddev:Math.sqrt(variance).toFixed(1), count:vals.length+'/'+total });
+
+      const fmtNum = (n) => isPercent ? n.toFixed(1) : (Number.isInteger(n) ? String(n) : n.toFixed(1));
+      result.push({
+        avg: mean.toFixed(1),
+        max: fmtNum(Math.max(...vals)),
+        min: fmtNum(Math.min(...vals)),
+        median: isPercent
+          ? med.toFixed(1)
+          : (sorted.length%2 ? String(sorted[mid]) : ((sorted[mid-1]+sorted[mid])/2).toFixed(1)),
+        stddev: Math.sqrt(variance).toFixed(1),
+        count: rawVals.length+'/'+total
+      });
     }
     return result;
   },
   gradesDetailAssessment() { if (!this.gradesDetailPanel) return null; return this.gradesOrderedAssessments.find(a => a.id === this.gradesDetailPanel.assessmentId) || null; },
   gradesDetailPanelStyle() { if (!this.gradesDetailPanel) return {}; const w=Math.min(320,window.innerWidth-16); return { position:'fixed', top:this.gradesDetailPanel.y+'px', left:this.gradesDetailPanel.x+'px', zIndex:9999, width:w+'px' }; },
 
-  // ★ v14: Returns info for the Set 1/Set 2 column being viewed (null otherwise)
   gradesDetailPanelColInfo() {
     if (!this.gradesDetailPanel) return null;
     const col = this.gradesOrderedColumns[this.gradesDetailPanel.idx];
@@ -1167,7 +1289,6 @@ GradesMethods._buildColumnsForAssessment = function(a) {
     if (hasMulti) {
       for (const p of a.papers) {
         if (hasAdj) {
-          // ★ v14: Per-paper independent fullMarks for Set 1 and Set 2
           const pFmS1 = p.fullMark;
           const pFmS2 = (p.fullMarkS2 != null && !isNaN(p.fullMarkS2) && p.fullMarkS2 > 0) ? p.fullMarkS2 : p.fullMark;
           cols.push({ colKey: a.id + '-p-' + p.id + '-s1', assessment: a, paperId: p.id, colType: 'paper-set1', label: 'Set 1', fullMark: pFmS1, readOnly: false });
@@ -1180,7 +1301,6 @@ GradesMethods._buildColumnsForAssessment = function(a) {
       return cols;
     }
     if (hasAdj) {
-      // ★ v14: Independent fullMarks for Set 1 (= a.fullMark) and Set 2 (= a.fullMarkS2)
       const fmS1 = a.fullMark;
       const fmS2 = (a.fullMarkS2 != null && !isNaN(a.fullMarkS2) && a.fullMarkS2 > 0) ? a.fullMarkS2 : a.fullMark;
       cols.push({ colKey: a.id + '-s1', assessment: a, colType: 'exam-set1', label: 'Set 1', fullMark: fmS1, readOnly: false });
