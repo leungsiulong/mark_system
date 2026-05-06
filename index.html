@@ -27,7 +27,6 @@
     .grades-table th,.grades-table td{border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;box-sizing:border-box}
     .grades-table thead tr:first-child th{border-top:1px solid #e5e7eb}
     .grades-table td:first-child,.grades-table th:first-child{border-left:1px solid #e5e7eb}
-    /* ★ v14: Lower thead z-index (was 20) so left sidebar (z-40) wins on mobile */
     .grades-table thead{position:sticky;top:0;z-index:5}
     .grades-table .frozen-sn{position:sticky;left:0;z-index:3;min-width:48px;width:48px;max-width:60px;white-space:nowrap;background:#fff}
     .grades-table .frozen-name{position:sticky;left:48px;z-index:3;white-space:nowrap;background:#fff;min-width:56px;max-width:120px;padding-left:6px;padding-right:6px}
@@ -46,11 +45,12 @@
     .report-row-highlight-excellent td{background-color:#f3e8ff!important}
     .grades-cell{cursor:cell;min-width:56px;height:32px;transition:background .1s}
     .grades-cell:hover{background:#f0f9ff}
-    .grades-cell.cell-focused{background:#dbeafe!important;outline:2px solid #3b82f6;outline-offset:-2px;z-index:2;position:relative}
-    .grades-cell.cell-selected{background:#eff6ff!important}
+    /* ★ v15: focused / selected cells only change OUTLINE — original colour & background preserved */
+    .grades-cell.cell-focused{outline:2px solid #3b82f6;outline-offset:-2px;z-index:2;position:relative}
+    .grades-cell.cell-selected{outline:1px solid #93c5fd;outline-offset:-1px;z-index:1;position:relative}
     .grades-cell.cell-warning{background:#fef3c7!important;color:#92400e}
     .grades-cell.cell-fail{background:#fee2e2!important;color:#991b1b}
-    .grades-cell.cell-fail.cell-focused{background:#fecaca!important;outline-color:#ef4444}
+    .grades-cell.cell-fail.cell-focused{outline-color:#ef4444}
     .grades-cell.cell-unentered{background:#fef3c7!important;animation:pulse-unentered 1.5s ease-in-out infinite}
     @keyframes pulse-unentered{0%,100%{background-color:#fef3c7}50%{background-color:#fde68a}}
     .grades-inline-input{width:100%;height:100%;border:none;outline:none;background:transparent;text-align:center;font-size:inherit;padding:0;margin:0;box-sizing:border-box}
@@ -106,10 +106,13 @@
     .custom-cat-delete-btn{padding:8px 10px;color:#9ca3af;border:none;border-left:1px solid #e5e7eb;background:transparent;cursor:pointer;transition:all .15s}
     .custom-cat-delete-btn:hover{color:#ef4444;background-color:#fef2f2}
 
-    /* ★ v14: Name template chips */
     .name-tpl-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:9999px;background:#eff6ff;color:#1d4ed8;font-size:12px;border:1px solid #bfdbfe;cursor:pointer;transition:all .15s;user-select:none;margin:2px}
     .name-tpl-chip:hover{background:#dbeafe;border-color:#93c5fd;transform:translateY(-1px)}
     .name-tpl-chip:active{transform:translateY(0)}
+
+    /* ★ v15: collapsible group header in analysis overview */
+    .analysis-group-header{cursor:pointer;background:#eff6ff;transition:background .15s;user-select:none}
+    .analysis-group-header:hover{background:#dbeafe}
 
     @media (max-width: 640px) {
       .cal-day{min-height:56px;padding:2px!important}
@@ -118,7 +121,6 @@
       .seg-track{min-width:130px;height:26px}
       .seg-option{font-size:10px}
     }
-    /* ★ v14: Ensure on mobile sidebar overlays everything (including grades sticky header) */
     @media (max-width: 1023px) {
       .mobile-sidebar { z-index: 40 !important; }
       .mobile-overlay { z-index: 35 !important; }
@@ -460,7 +462,6 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">名稱</label>
             <input v-model="modalData.name" name="assessmentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
-            <!-- ★ v14: Name template chips -->
             <div v-if="nameTemplates && nameTemplates.length > 0" class="mt-2 flex flex-wrap items-center gap-0.5">
               <span class="text-xs text-gray-500 mr-1">快速插入：</span>
               <button v-for="(tpl, ti) in nameTemplates" :key="ti" type="button"
@@ -513,7 +514,6 @@
                   <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label><input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
                   <div><label class="text-xs text-gray-600">Set 2 封頂分</label><input v-model.number="modalData.passingScore" type="number" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
                 </div>
-                <!-- ★ v14: Set 2 independent fullMark (only when not multi-paper) -->
                 <div v-if="!modalData.hasMultiplePapers">
                   <label class="text-xs text-gray-600">Set 2 滿分（留空 = 與 Set 1 相同）</label>
                   <input v-model="modalData.fullMarkS2" type="number" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
@@ -631,7 +631,6 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">名稱（留空自動命名）</label>
             <input v-model="modalData.name" name="assessmentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：課業1">
-            <!-- ★ v14: Name template chips for calendar modal too -->
             <div v-if="nameTemplates && nameTemplates.length > 0" class="mt-2 flex flex-wrap items-center gap-0.5">
               <span class="text-xs text-gray-500 mr-1">快速插入：</span>
               <button v-for="(tpl, ti) in nameTemplates" :key="ti" type="button"
@@ -994,6 +993,28 @@
             <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2">
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
                 <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'bg-blue-50 border-blue-300 text-blue-700 font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
+
+                <div class="flex-1"></div>
+
+                <!-- ★ v15: Display mode segmented control -->
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs text-gray-500 hidden sm:inline">顯示：</span>
+                  <div class="seg-track" style="grid-template-columns: repeat(3, 1fr); min-width: 180px; height: 28px;">
+                    <div class="seg-thumb-wrap"
+                      :style="{width: 'calc((100% - 4px) / 3)', transform: 'translateX(' + (gradesDisplayModeIdx * 100) + '%)'}">
+                      <div class="seg-thumb-pill"></div>
+                    </div>
+                    <button type="button" class="seg-option"
+                      :class="{'seg-active': gradesDisplayMode === 'raw'}"
+                      @click="gradesSetDisplayMode('raw')" title="顯示真實分數">分數</button>
+                    <button type="button" class="seg-option"
+                      :class="{'seg-active': gradesDisplayMode === 'percent'}"
+                      @click="gradesSetDisplayMode('percent')" title="顯示百分比">百分比</button>
+                    <button type="button" class="seg-option"
+                      :class="{'seg-active': gradesDisplayMode === 'rank'}"
+                      @click="gradesSetDisplayMode('rank')" title="顯示班內排名">排名</button>
+                  </div>
+                </div>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button @click="openAddAssessmentModal('assignment')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition"><i class="fas fa-plus mr-1"></i>課業</button>
@@ -1084,7 +1105,7 @@
                         @mouseleave="gradesOnCellMouseLeave()"
                         class="text-center text-sm px-1 py-0.5">
                       <template v-if="gradesFocusRow===ri&&gradesFocusCol===ci&&!col.readOnly"><input ref="gradesEditInput" v-model="gradesEditValue" @blur="gradesOnCellBlur" class="grades-inline-input"></template>
-                      <template v-else>{{gradesGetDisplayScore(s.id,ci)}}</template>
+                      <template v-else>{{gradesGetCellDisplayText(s.id,ci)}}</template>
                     </td>
                   </tr>
                   <tr v-for="stat in gradesStatRows" :key="stat.key" class="bg-gray-50">
@@ -1096,13 +1117,12 @@
                 </tbody>
               </table>
             </div>
-            <div v-if="gradesDetailPanel&&gradesDetailAssessment" :style="gradesDetailPanelStyle" class="detail-panel" @click.stop>
+            <div v-if="gradesDetailPanel&&gradesDetailAssessment" :style="gradesDetailPanelStyle" class="detail-panel" @click.stop @mousedown.stop>
               <div class="px-4 py-3 border-b flex items-center gap-2" :style="gradesAssessmentHeaderStyle(gradesDetailPanel.idx)">
                 <div class="flex-1"><div class="font-bold text-sm">{{gradesDetailAssessment.name}}</div><div class="text-xs opacity-70">{{assessmentLabel(gradesDetailAssessment.type)}}</div></div>
                 <button @click="gradesCloseDetailPanel" class="p-1 rounded hover:bg-black/10 text-lg leading-none">&times;</button>
               </div>
               <div class="px-4 py-3 space-y-2 text-sm">
-                <!-- ★ v14: Inline Set 1/2 fullMark editor -->
                 <div v-if="gradesDetailPanelColInfo" class="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 mb-2">
                   <div class="text-xs font-semibold text-yellow-800 mb-1.5">
                     <i class="fas fa-edit mr-1"></i>修改{{gradesDetailPanelColInfo.setLabel}}總分
@@ -1477,8 +1497,23 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="r in analysisClassOverviewData.rows" :key="r.id" class="border-t hover:bg-gray-50">
-                        <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
+                      <!-- ★ v15: Collapsible assignment group header -->
+                      <tr v-if="analysisAssignmentRowsCount > 0" class="analysis-group-header border-t" @click="analysisToggleAssignmentCollapse">
+                        <td class="px-2 py-2 font-semibold text-blue-700">
+                          <i class="fas fa-chevron-right text-xs mr-1 transition-transform" :class="{'rotate-90': !analysisOverviewAssignmentCollapsed}"></i>
+                          課業 <span class="text-xs text-gray-500 font-normal">({{analysisAssignmentRowsCount}} 個項目)</span>
+                        </td>
+                        <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white bg-blue-500">課業</span></td>
+                        <td class="px-2 py-2 text-center text-gray-400">—</td>
+                        <td class="px-2 py-2 text-center text-blue-700 font-medium" colspan="7">
+                          <span v-if="analysisAssignmentAggregateInfo && analysisAssignmentAggregateInfo.avgOfAvgs !== null">
+                            平均（各項平均之均值）：{{analysisAssignmentAggregateInfo.avgOfAvgs.toFixed(1)}}　
+                          </span>
+                          <span class="text-xs text-gray-500 font-normal">{{analysisOverviewAssignmentCollapsed ? '點擊展開' : '點擊收起'}}</span>
+                        </td>
+                      </tr>
+                      <tr v-for="r in analysisClassOverviewVisibleRows" :key="r.id" class="border-t hover:bg-gray-50">
+                        <td class="px-2 py-2 font-medium text-gray-800" :class="r.type === 'assignment' ? 'pl-6' : ''">{{r.name}}</td>
                         <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
                         <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
                         <td class="px-2 py-2 text-center">{{r.avg !== null ? r.avg.toFixed(1) : '—'}}</td>
@@ -1539,8 +1574,9 @@
                     </h4>
                     <button v-if="analysisTrendSelectedStudents.length > 0" @click="analysisClearTrendStudents" class="text-xs text-gray-500 hover:text-red-500">清除所選</button>
                   </div>
+                  <!-- ★ v15: Use gradesSortedStudents for natural number ordering (1, 2, 3 instead of 1, 10, 11) -->
                   <div class="max-h-40 overflow-y-auto bg-gray-50 rounded-lg p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-                    <label v-for="s in currentStudents" :key="s.id" class="flex items-center gap-1.5 text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white">
+                    <label v-for="s in gradesSortedStudents" :key="s.id" class="flex items-center gap-1.5 text-xs cursor-pointer py-0.5 px-1 rounded hover:bg-white">
                       <input type="checkbox" :checked="analysisTrendSelectedStudents.includes(s.id)" @change="analysisToggleTrendStudent(s.id)" class="rounded border-gray-300">
                       <span class="text-gray-400">{{s.studentNumber}}</span>
                       <span class="truncate text-gray-700">{{s.studentName}}</span>
@@ -1582,10 +1618,22 @@
                         <td class="px-2 py-2 text-gray-800 font-medium">
                           <span class="cursor-pointer hover:text-blue-600 hover:underline" @click="analysisSelectStudent(r.studentId); analysisSetTab('student')" title="查看學生分析">{{r.studentName}}</span>
                         </td>
-                        <td class="px-2 py-2 text-center">{{r.t1a3 !== null ? r.t1a3 : '—'}}</td>
-                        <td class="px-2 py-2 text-center">{{r.t1exam !== null ? r.t1exam.toFixed(1) : '—'}}</td>
-                        <td class="px-2 py-2 text-center">{{r.t2a3 !== null ? r.t2a3 : '—'}}</td>
-                        <td class="px-2 py-2 text-center">{{r.t2exam !== null ? r.t2exam.toFixed(1) : '—'}}</td>
+                        <td class="px-2 py-2 text-center">
+                          <span v-if="r.t1a3 !== null">{{r.t1a3}}<span v-if="r.t1a3Rank" class="text-xs text-gray-400 ml-1">(#{{r.t1a3Rank}})</span></span>
+                          <span v-else>—</span>
+                        </td>
+                        <td class="px-2 py-2 text-center">
+                          <span v-if="r.t1exam !== null">{{r.t1exam.toFixed(1)}}<span v-if="r.t1examRank" class="text-xs text-gray-400 ml-1">(#{{r.t1examRank}})</span></span>
+                          <span v-else>—</span>
+                        </td>
+                        <td class="px-2 py-2 text-center">
+                          <span v-if="r.t2a3 !== null">{{r.t2a3}}<span v-if="r.t2a3Rank" class="text-xs text-gray-400 ml-1">(#{{r.t2a3Rank}})</span></span>
+                          <span v-else>—</span>
+                        </td>
+                        <td class="px-2 py-2 text-center">
+                          <span v-if="r.t2exam !== null">{{r.t2exam.toFixed(1)}}<span v-if="r.t2examRank" class="text-xs text-gray-400 ml-1">(#{{r.t2examRank}})</span></span>
+                          <span v-else>—</span>
+                        </td>
                         <td class="px-2 py-2 text-center font-bold">{{r.yearlyTotal !== null ? r.yearlyTotal.toFixed(1) : '—'}}</td>
                         <td class="px-2 py-2 text-center">
                           <span v-if="r.rankTrend === null" class="text-gray-300">—</span>
@@ -1612,10 +1660,11 @@
             <template v-else>
               <div class="flex flex-wrap items-center gap-3 mb-4 bg-white rounded-xl shadow p-3">
                 <label class="text-sm font-medium text-gray-700 shrink-0">選擇學生：</label>
+                <!-- ★ v15: Sort dropdown by natural numeric order using gradesSortedStudents -->
                 <select :value="analysisStudentId || ''" @change="analysisSelectStudent($event.target.value || null)"
                   class="flex-1 min-w-0 max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm">
                   <option value="">-- 請選擇學生 --</option>
-                  <option v-for="s in currentStudents" :key="s.id" :value="s.id">{{s.studentNumber}} {{s.studentName}}</option>
+                  <option v-for="s in gradesSortedStudents" :key="s.id" :value="s.id">{{s.studentNumber}} {{s.studentName}}</option>
                 </select>
               </div>
 
@@ -1653,7 +1702,7 @@
                     <i class="fas fa-list text-blue-500 mr-1"></i>各項分數對比
                   </h3>
                   <div class="overflow-x-auto">
-                    <table class="w-full text-xs sm:text-sm" style="min-width:720px">
+                    <table class="w-full text-xs sm:text-sm" style="min-width:780px">
                       <thead class="bg-gray-50">
                         <tr>
                           <th @click="analysisSortStudentScores('termName')" class="px-2 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">學期 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
@@ -1662,6 +1711,8 @@
                           <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
                           <th class="px-2 py-2 text-center whitespace-nowrap">學生分數</th>
                           <th @click="analysisSortStudentScores('studentPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">百分制 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <!-- ★ v15: Per-assessment ranking column -->
+                          <th @click="analysisSortStudentScores('rank')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap bg-yellow-50">排名 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
                           <th @click="analysisSortStudentScores('classAvgPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">班均 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
                           <th @click="analysisSortStudentScores('diff')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">差距 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
                           <th class="px-2 py-2 text-center whitespace-nowrap">表現</th>
@@ -1675,6 +1726,13 @@
                           <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
                           <td class="px-2 py-2 text-center font-medium">{{r.studentScore !== null ? r.studentScore : '—'}}</td>
                           <td class="px-2 py-2 text-center">{{r.studentPct !== null ? r.studentPct.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center bg-yellow-50">
+                            <span v-if="r.rank">
+                              <strong class="text-amber-700">{{r.rank}}</strong>
+                              <span class="text-xs text-gray-400">/{{r.totalRanked}}</span>
+                            </span>
+                            <span v-else class="text-gray-300">—</span>
+                          </td>
                           <td class="px-2 py-2 text-center text-gray-500">{{r.classAvgPct !== null ? r.classAvgPct.toFixed(1) : '—'}}</td>
                           <td class="px-2 py-2 text-center" :class="r.diff === null ? 'text-gray-400' : (r.diff > 0 ? 'text-green-600 font-medium' : (r.diff < 0 ? 'text-red-600 font-medium' : 'text-gray-500'))">
                             {{r.diff === null ? '—' : (r.diff > 0 ? '+' : '') + r.diff.toFixed(1)}}
@@ -1901,7 +1959,6 @@
             <div @click="settingsEnter({key:'years',label:'學年管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><i class="fas fa-sitemap text-blue-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-blue-600">學年班別管理</h3></div><p class="text-sm text-gray-500">管理學年、班別、科目及學生</p></div>
             <div @click="settingsEnter({key:'layout',label:'外觀設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center shrink-0"><i class="fas fa-palette text-pink-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-pink-600">外觀設定</h3></div><p class="text-sm text-gray-500">自訂介面主題顏色與標籤排序</p></div>
             <div @click="settingsEnter({key:'quicknav',label:'快速導航設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-th-large text-green-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-green-600">快速導航設定</h3></div><p class="text-sm text-gray-500">自訂首頁快速導航項目</p></div>
-            <!-- ★ v14: Name templates entry -->
             <div @click="settingsEnter({key:'nameTemplates',label:'名稱模板管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0"><i class="fas fa-tags text-amber-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-amber-600">名稱模板管理</h3></div><p class="text-sm text-gray-500">管理新增評估時的快速命名模板</p></div>
           </div>
 
@@ -2071,7 +2128,6 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><div v-for="item in inactiveQuickNavItems" :key="item.key" @click="addQuickNav(item.key)" class="bg-white rounded-lg shadow p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition group"><div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0" :style="{background:'linear-gradient(135deg,'+item.gradient[0]+','+item.gradient[1]+')'}"><i :class="item.icon" class="text-sm"></i></div><span class="text-sm font-medium text-gray-700 group-hover:text-blue-600">{{item.label}}</span><i class="fas fa-plus ml-auto text-gray-300 group-hover:text-blue-500 text-xs"></i></div></div>
           </div>
 
-          <!-- ★ v14: Name Templates settings page -->
           <div v-if="settingsCurrentView==='nameTemplates'">
             <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-2">名稱模板管理</h2>
             <p class="text-sm text-gray-500 mb-4">在此管理新增評估項目時，名稱輸入框下方顯示的快速插入模板。模板會以追加方式插入到名稱中，方便組合使用。</p>
