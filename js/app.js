@@ -1,5 +1,5 @@
 // ================================================================
-// Main Application (v18 — export module, touch preview/edit, numeric input)
+// Main Application (v19 — global theme token system)
 // ================================================================
 const { createApp } = Vue;
 
@@ -90,10 +90,11 @@ createApp({
 
   computed: {
     themeColors() { return this.colorThemes.find(t => t.key === this.currentTheme) || this.colorThemes[0]; },
-    headerStyle() { const t=this.themeColors; return { background:'linear-gradient(to right,'+t.gradient[0]+','+t.gradient[1]+')' }; },
-    bannerStyle() { const t=this.themeColors; return { background:'linear-gradient(to right,'+t.gradient[1]+','+t.accent+')' }; },
-    activeTabStyle() { const t=this.themeColors; return { borderColor:t.accent, color:t.text, backgroundColor:t.accentBg }; },
-    treeActiveStyle() { const t=this.themeColors; return { backgroundColor:t.accentBg, color:t.text }; },
+    // ★ v19: 全部主色相關 style 改用 CSS variables，主題切換即時生效
+    headerStyle() { return { background:'linear-gradient(135deg, var(--theme-gradient-from), var(--theme-primary), var(--theme-secondary))' }; },
+    bannerStyle() { return { background:'radial-gradient(circle at 85% 10%, rgba(255,255,255,0.25), transparent 18rem), linear-gradient(135deg, var(--theme-gradient-from), var(--theme-primary) 55%, var(--theme-secondary))' }; },
+    activeTabStyle() { return { background:'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))', color:'#fff', borderColor:'transparent', borderRadius:'999px', boxShadow:'0 10px 24px rgba(var(--theme-primary-rgb),0.22)' }; },
+    treeActiveStyle() { return { backgroundColor:'rgba(var(--theme-primary-rgb),0.10)', color:'var(--theme-text)', boxShadow:'inset 0 0 0 1px rgba(var(--theme-primary-rgb),0.28)' }; },
     orderedTabs() { return this.tabOrder.map(key => this.allTabs.find(t => t.key === key)).filter(Boolean); },
     standardThemes() { return this.colorThemes.filter(t => t.group === 'standard'); },
     earthThemes() { return this.colorThemes.filter(t => t.group === 'earth'); },
@@ -259,6 +260,8 @@ createApp({
   },
 
   watch: {
+    // ★ v19: 主題改變時，無論透過什麼途徑，都重寫 CSS variables
+    currentTheme() { this.$nextTick(() => this.applyThemeTokens()); },
     currentAcademicYearId(nv, ov) {
       if (nv !== ov) { if (this.currentClassId) { const year=this.academicYears.find(y=>y.id===nv); if (!year||!year.classes.find(c=>c.id===this.currentClassId)) this.currentClassId=null; } this.gradesResetFocus(); }
     },
@@ -440,7 +443,47 @@ createApp({
       this.modalData.selectedStudentIds = this.modalData.selectedStudentIds.filter(id => !ids.has(id));
     },
 
-    setTheme(key) { this.currentTheme=key;this.saveLayoutSettings();this.addToast('已切換至「'+this.themeColors.name+'」主題','success'); },
+    // ★ v19: 依 currentTheme 把主題色寫入 CSS variables（全站即時變色核心）
+    applyThemeTokens() {
+      const t = this.themeColors || {};
+      const root = document.documentElement;
+      const hexToRgb = (hex) => {
+        if (!hex) return [37, 99, 235];
+        let h = String(hex).replace('#', '').trim();
+        if (h.length === 3) h = h.split('').map(c => c + c).join('');
+        if (h.length !== 6) return [37, 99, 235];
+        const n = parseInt(h, 16);
+        if (isNaN(n)) return [37, 99, 235];
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      };
+      const primary = t.accent || '#2563eb';
+      const text = t.text || primary;
+      const from = (t.gradient && t.gradient[0]) || primary;
+      const to = (t.gradient && t.gradient[1]) || primary;
+      const secondary = t.secondary || (t.gradient && t.gradient[1]) || '#38bdf8';
+      const accent2 = t.accent2 || '#8b5cf6';
+      const pRgb = hexToRgb(primary);
+      const sRgb = hexToRgb(secondary);
+      const aRgb = hexToRgb(accent2);
+      const set = (k, v) => root.style.setProperty(k, v);
+      set('--theme-primary', primary);
+      set('--theme-primary-rgb', pRgb.join(','));
+      set('--theme-secondary', secondary);
+      set('--theme-secondary-rgb', sRgb.join(','));
+      set('--theme-accent', accent2);
+      set('--theme-accent-rgb', aRgb.join(','));
+      set('--theme-gradient-from', from);
+      set('--theme-gradient-to', to);
+      set('--theme-text', text);
+      set('--theme-soft-bg', 'rgba(' + pRgb.join(',') + ',0.10)');
+      set('--theme-soft-border', 'rgba(' + pRgb.join(',') + ',0.32)');
+      set('--theme-bg-1', 'rgba(' + pRgb.join(',') + ',0.14)');
+      set('--theme-bg-2', 'rgba(' + aRgb.join(',') + ',0.12)');
+      set('--theme-bg-3', 'rgba(' + sRgb.join(',') + ',0.10)');
+      set('--focus-ring', 'rgba(' + pRgb.join(',') + ',0.16)');
+    },
+
+    setTheme(key) { this.currentTheme=key; this.applyThemeTokens(); this.saveLayoutSettings(); this.addToast('已切換至「'+this.themeColors.name+'」主題','success'); },
     moveTabUp(idx) { if(idx<=0)return;const a=[...this.tabOrder];[a[idx-1],a[idx]]=[a[idx],a[idx-1]];this.tabOrder=a;this.saveLayoutSettings(); },
     moveTabDown(idx) { if(idx>=this.tabOrder.length-1)return;const a=[...this.tabOrder];[a[idx],a[idx+1]]=[a[idx+1],a[idx]];this.tabOrder=a;this.saveLayoutSettings(); },
     async saveLayoutSettings() { try{await db.collection('settings').doc('main').set({themeColor:this.currentTheme,tabOrder:this.tabOrder},{merge:true});}catch(e){console.error(e);} },
@@ -550,13 +593,13 @@ createApp({
           max-width:none!important;
         }
         .grades-cell input:focus{outline:none!important;border:none!important;box-shadow:none!important;}
-        .grades-cell input::selection{background:rgba(59,130,246,0.25)}
+        .grades-cell input::selection{background:rgba(var(--theme-primary-rgb),0.25)}
         .grades-table tr.row-hover-highlight .frozen-sn,
         .grades-table tr.row-hover-highlight .frozen-name,
-        .grades-table tr.row-hover-highlight .frozen-class { background:#eff6ff !important; transition: background-color .12s }
+        .grades-table tr.row-hover-highlight .frozen-class { background:rgba(var(--theme-primary-rgb),0.06) !important; transition: background-color .12s }
         .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
-        /* ★ v18: 觸控預覽模式（已選取但未編輯）以較明顯外框提示 */
-        .grades-touch-device .grades-cell.cell-focused{outline:2px solid #2563eb!important;outline-offset:-2px}
+        /* ★ v18: 觸控預覽模式（已選取但未編輯）以較明顯外框提示，外框跟隨主題 */
+        .grades-touch-device .grades-cell.cell-focused{outline:2px solid var(--theme-primary)!important;outline-offset:-2px}
       `;
       document.head.appendChild(style);
     }
@@ -568,8 +611,10 @@ createApp({
     this.gradesIsTouchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     if (this.gradesIsTouchDevice) document.body.classList.add('grades-touch-device');
     this._injectCustomStyles();
+    this.applyThemeTokens(); // ★ v19: 預設主題先套用，避免閃白
     this._analysisCharts = {};
     await this.loadAllData();
+    this.applyThemeTokens(); // ★ v19: 載入 Firestore themeColor 後再套用
     this.initScoringWeights();
     document.addEventListener('keydown',(e)=>{
       if(e.key==='Escape'){
