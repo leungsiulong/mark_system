@@ -10,6 +10,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- ★ v18: 匯出所需套件（Excel / PDF） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     [v-cloak]{display:none}
     body{margin:0;font-family:'Segoe UI','Microsoft JhengHei',sans-serif;background:#f3f4f6;overflow:hidden;height:100vh}
@@ -454,12 +458,12 @@
         </template>
 
         <template v-if="modalType==='addStudent'">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">學號</label><input v-model="modalData.studentNumber" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：1"></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">學號</label><input v-model="modalData.studentNumber" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：1"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">姓名</label><input v-model="modalData.studentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：陳大文"></div>
           <div v-if="modalData.matchedGlobal" class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><p class="text-blue-700 mb-2"><i class="fas fa-link mr-1"></i>找到全域學生記錄：<strong>{{modalData.matchedGlobal.name}}</strong></p><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.linkToGlobal" class="rounded border-gray-300"><span class="text-blue-600">關聯此全域記錄</span></label></div>
         </template>
         <template v-if="modalType==='editStudent'">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">學號</label><input v-model="modalData.studentNumber" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">學號</label><input v-model="modalData.studentNumber" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">姓名</label><input v-model="modalData.studentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
         </template>
         <template v-if="modalType==='batchImport'">
@@ -490,7 +494,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">名稱（可留空，自動命名）</label>
             <input v-model="modalData.name" name="assessmentName" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="請輸入名稱">
           </div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1">滿分（Set 1 / 正常卷）</label><input v-model="modalData.fullMark" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1">滿分（Set 1 / 正常卷）</label><input v-model="modalData.fullMark" type="number" inputmode="numeric" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">日期</label><input v-model="modalData.date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1">備注</label><textarea v-model="modalData.notes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="選填（Shift+Enter 換行）"></textarea></div>
 
@@ -517,7 +521,7 @@
                 </div>
                 <div v-for="(si, idx) in modalData.subItems" :key="idx" class="flex items-center gap-2">
                   <input v-model="si.name" placeholder="例：外觀" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="si.fullMark" type="number" min="1" placeholder="滿分" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="si.fullMark" type="number" inputmode="numeric" min="1" placeholder="滿分" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemoveSubItem(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddSubItem()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50"><i class="fas fa-plus mr-1"></i>新增小項目</button>
@@ -531,12 +535,12 @@
               <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" v-model="modalData.hasAdjustedPaper" class="mt-0.5 rounded border-gray-300"><div><div class="text-sm font-medium text-red-800">有調適卷 (Set 1 / Set 2)</div><div class="text-xs text-red-700 mt-0.5">Set 1 為正常卷；Set 2 可有不同總分，得分按比例換算後 × 乘數，並封頂於合格分數。</div></div></label>
               <div v-if="modalData.hasAdjustedPaper" class="mt-3 space-y-2">
                 <div class="grid grid-cols-2 gap-2">
-                  <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label><input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
-                  <div><label class="text-xs text-gray-600">Set 2 封頂分</label><input v-model.number="modalData.passingScore" type="number" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
+                  <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label><input v-model.number="modalData.adjustedMultiplier" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
+                  <div><label class="text-xs text-gray-600">Set 2 封頂分</label><input v-model.number="modalData.passingScore" type="number" inputmode="numeric" min="0" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none"></div>
                 </div>
                 <div v-if="!modalData.hasMultiplePapers">
                   <label class="text-xs text-gray-600">Set 2 滿分（留空 = 與 Set 1 相同）</label>
-                  <input v-model="modalData.fullMarkS2" type="number" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  <input v-model="modalData.fullMarkS2" type="number" inputmode="numeric" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                   <p class="text-xs text-red-500 mt-1">
                     <i class="fas fa-info-circle mr-1"></i>
                     例：Set 1 滿分 100、Set 2 滿分 80 ⇒ 學生 Set 2 得 60 分 ≈ Set 1 的 75 分，再 × 乘數及封頂。
@@ -556,9 +560,9 @@
                 </div>
                 <div v-for="(p, idx) in modalData.papers" :key="idx" class="flex items-center gap-1">
                   <input v-model="p.name" placeholder="分卷名稱" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" min="1" placeholder="預設=S1" :title="'Set 2 滿分（留空 = 與 S1 相同）'" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.fullMark" type="number" inputmode="numeric" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" inputmode="numeric" min="1" placeholder="預設=S1" :title="'Set 2 滿分（留空 = 與 S1 相同）'" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.weight" type="number" inputmode="numeric" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemovePaper(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddPaper()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50"><i class="fas fa-plus mr-1"></i>新增分卷</button>
@@ -673,7 +677,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">滿分（Set 1 / 正常卷）</label>
-            <input v-model="modalData.fullMark" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
+            <input v-model="modalData.fullMark" type="number" inputmode="numeric" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none">
           </div>
 
           <div>
@@ -715,7 +719,7 @@
                 </div>
                 <div v-for="(si, idx) in modalData.subItems" :key="idx" class="flex items-center gap-2">
                   <input v-model="si.name" placeholder="例：外觀" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="si.fullMark" type="number" min="1" placeholder="滿分" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="si.fullMark" type="number" inputmode="numeric" min="1" placeholder="滿分" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemoveSubItem(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddSubItem()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50">
@@ -738,15 +742,15 @@
               <div v-if="modalData.hasAdjustedPaper" class="mt-3 space-y-2">
                 <div class="grid grid-cols-2 gap-2">
                   <div><label class="text-xs text-gray-600">Set 2 乘數 (%)</label>
-                    <input v-model.number="modalData.adjustedMultiplier" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                    <input v-model.number="modalData.adjustedMultiplier" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                   </div>
                   <div><label class="text-xs text-gray-600">Set 2 封頂分</label>
-                    <input v-model.number="modalData.passingScore" type="number" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                    <input v-model.number="modalData.passingScore" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                   </div>
                 </div>
                 <div v-if="!modalData.hasMultiplePapers">
                   <label class="text-xs text-gray-600">Set 2 滿分（留空 = 與 Set 1 相同）</label>
-                  <input v-model="modalData.fullMarkS2" type="number" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
+                  <input v-model="modalData.fullMarkS2" type="number" inputmode="numeric" min="1" placeholder="預設等於 Set 1" class="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none">
                 </div>
               </div>
             </div>
@@ -768,9 +772,9 @@
                 </div>
                 <div v-for="(p, idx) in modalData.papers" :key="idx" class="flex items-center gap-1">
                   <input v-model="p.name" placeholder="分卷名稱" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none">
-                  <input v-model.number="p.fullMark" type="number" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" min="1" placeholder="預設=S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
-                  <input v-model.number="p.weight" type="number" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.fullMark" type="number" inputmode="numeric" min="1" placeholder="S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-if="modalData.hasAdjustedPaper" v-model="p.fullMarkS2" type="number" inputmode="numeric" min="1" placeholder="預設=S1" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
+                  <input v-model.number="p.weight" type="number" inputmode="numeric" min="0" max="100" placeholder="權重" class="w-14 border border-gray-300 rounded px-2 py-1 text-sm text-center outline-none">
                   <button @click="gradesModalRemovePaper(idx)" type="button" class="text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button>
                 </div>
                 <button @click="gradesModalAddPaper()" type="button" class="w-full px-3 py-1.5 text-xs bg-white border-2 border-dashed border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50">
@@ -1047,6 +1051,8 @@
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <!-- ★ 新增項目按鈕群 -->
+                <span class="text-xs text-gray-400 font-semibold hidden sm:inline mr-0.5"><i class="fas fa-plus-circle mr-0.5"></i>新增</span>
                 <button @click="openAddAssessmentModal('assignment')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition"><i class="fas fa-plus mr-1"></i>課業</button>
                 <button @click="openAddAssessmentModal('quiz')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 transition"><i class="fas fa-plus mr-1"></i>小測</button>
                 <div class="relative">
@@ -1081,12 +1087,35 @@
                   </div>
                 </div>
 
-                <button @click="exportCSV" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition" title="匯出此學期成績為 CSV 檔案"><i class="fas fa-file-csv mr-1"></i>匯出 CSV</button>
+                <div class="w-px h-5 bg-gray-200 mx-0.5"></div>
+
+                <!-- ★ v18: 匯出按鈕（與新增按鈕區隔的獨立樣式：深色實心 + 下拉選單） -->
+                <div class="relative">
+                  <button @click.stop="gradesExportMenuOpen=!gradesExportMenuOpen"
+                    class="px-2.5 sm:px-3 py-1 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 shadow-sm transition flex items-center gap-1"
+                    title="匯出此學期成績">
+                    <i class="fas fa-download"></i>
+                    <span>匯出</span>
+                    <i class="fas fa-caret-down ml-0.5"></i>
+                  </button>
+                  <div v-if="gradesExportMenuOpen" class="absolute top-full mt-1 right-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-44" @click.stop>
+                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-400 border-b">選擇匯出格式</div>
+                    <button @click="exportGradesExcel" class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700">
+                      <i class="fas fa-file-excel text-emerald-600 w-4"></i><span>Excel（含格式）</span>
+                    </button>
+                    <button @click="exportGradesPDF" class="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700">
+                      <i class="fas fa-file-pdf text-red-600 w-4"></i><span>PDF（含格式）</span>
+                    </button>
+                    <button @click="exportCSV" class="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700">
+                      <i class="fas fa-file-csv text-blue-600 w-4"></i><span>CSV（純文字）</span>
+                    </button>
+                  </div>
+                </div>
 
                 <span v-if="Object.keys(gradesSavingCells).length>0" class="text-xs text-gray-400 ml-1 sm:ml-2"><i class="fas fa-circle-notch fa-spin mr-1"></i>儲存中...</span>
                 <div class="flex-1"></div>
                 <label class="flex items-center gap-1 sm:gap-1.5 cursor-pointer select-none text-sm"><input type="checkbox" v-model="gradesShowFailHighlight" class="rounded border-gray-300 text-red-500 focus:ring-red-300"><span class="text-gray-600 text-xs hidden sm:inline">標示不合格</span><span class="text-gray-600 text-xs sm:hidden">不合格</span></label>
-                <div v-if="gradesShowFailHighlight" class="flex items-center gap-1 text-xs text-gray-500"><span class="hidden sm:inline">不合格線</span><input type="number" :value="gradesFailPercent!==null?gradesFailPercent:''" :placeholder="gradesAutoFailPercent+'%'" @input="gradesSetFailPercent($event.target.value===''?null:$event.target.value)" class="w-10 sm:w-12 border border-gray-300 rounded px-1 py-0.5 text-center text-xs" min="0" max="100"><span>%</span><span v-if="gradesFailPercent===null" class="text-gray-400 hidden sm:inline">(自動)</span></div>
+                <div v-if="gradesShowFailHighlight" class="flex items-center gap-1 text-xs text-gray-500"><span class="hidden sm:inline">不合格線</span><input type="number" inputmode="numeric" :value="gradesFailPercent!==null?gradesFailPercent:''" :placeholder="gradesAutoFailPercent+'%'" @input="gradesSetFailPercent($event.target.value===''?null:$event.target.value)" class="w-10 sm:w-12 border border-gray-300 rounded px-1 py-0.5 text-center text-xs" min="0" max="100"><span>%</span><span v-if="gradesFailPercent===null" class="text-gray-400 hidden sm:inline">(自動)</span></div>
               </div>
             </div>
             <div v-if="gradesOrderedAssessments.length===0" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p class="font-medium">尚未新增評估項目</p><p class="text-sm mt-1">請使用上方按鈕新增課業、小測或考試</p></div></div>
@@ -1178,10 +1207,12 @@
                         :class="gradesCellClass(ri,ci,s.id)"
                         :data-acol="ci"
                         @mousedown="gradesOnCellMouseDown(ri, ci, $event)"
+                        @click="gradesOnCellClick(ri, ci, $event)"
                         @mouseenter="gradesOnCellMouseEnter($event,ri,ci)"
                         @mouseleave="gradesOnCellMouseLeave()"
                         class="text-center text-sm px-1 py-0.5">
-                      <template v-if="gradesFocusRow===ri&&gradesFocusCol===ci&&!col.readOnly"><input ref="gradesEditInput" v-model="gradesEditValue" @blur="gradesOnCellBlur" class="grades-inline-input"></template>
+                      <!-- ★ v15: 觸控時需進入「編輯模式」(gradesActivelyEditing) 才顯示輸入框；桌面維持原行為 -->
+                      <template v-if="gradesFocusRow===ri&&gradesFocusCol===ci&&!col.readOnly&&(!gradesIsTouchDevice||gradesActivelyEditing)"><input ref="gradesEditInput" v-model="gradesEditValue" inputmode="decimal" @blur="gradesOnCellBlur" class="grades-inline-input"></template>
                       <template v-else>{{gradesGetCellDisplayText(s.id,ci)}}</template>
                     </td>
                   </tr>
@@ -1206,7 +1237,7 @@
                     <span v-if="gradesDetailPanelColInfo.paperName" class="text-gray-500 font-normal">（分卷：{{gradesDetailPanelColInfo.paperName}}）</span>
                   </div>
                   <div class="flex gap-2 items-center">
-                    <input v-model="gradesDetailEditFullMark" type="number" min="1" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-yellow-400">
+                    <input v-model="gradesDetailEditFullMark" type="number" inputmode="numeric" min="1" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-yellow-400">
                     <button @click="gradesSaveSetFullMark" class="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 transition whitespace-nowrap">
                       <i class="fas fa-save mr-0.5"></i>儲存
                     </button>
@@ -1238,7 +1269,8 @@
             </div>
             <div class="shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between text-xs text-gray-400">
               <span>共 {{gradesSortedStudents.length}} 位學生 · {{gradesOrderedAssessments.length}} 個項目</span>
-              <span class="hidden sm:inline">小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼 · 方向鍵移動 · F2 微調 · Ctrl+Z 復原</span>
+              <span v-if="gradesIsTouchDevice" class="sm:inline">輕觸預覽，再次輕觸進入編輯</span>
+              <span v-else class="hidden sm:inline">小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼 · 方向鍵移動 · F2 微調 · Ctrl+Z 復原</span>
             </div>
           </template>
         </div>
@@ -1309,15 +1341,15 @@
                   </button>
                   <div v-if="scoringAccordion.ut" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4">
-                      <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.assignment" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.quiz" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">統測</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.unifiedTest" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.classPerformance" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.assignment" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.quiz" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">統測</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.unifiedTest" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.classPerformance" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                     </div>
                     <div v-if="scoringCustomCategories.length>0" class="mt-3 pt-3 border-t">
                       <h5 class="text-xs font-semibold text-gray-500 mb-2">自訂類別權重</h5>
                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                        <div v-for="cat in scoringCustomCategories" :key="cat.id"><label class="text-xs text-gray-500 mb-1 block">{{cat.name}}</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.customCategories[cat.id]" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                        <div v-for="cat in scoringCustomCategories" :key="cat.id"><label class="text-xs text-gray-500 mb-1 block">{{cat.name}}</label><div class="flex"><input v-model.number="scoringWeightsLocal.ut.customCategories[cat.id]" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                       </div>
                     </div>
                     <div class="mt-2 text-sm font-medium" :class="scoringUTWeightTotal===100?'text-green-600':'text-red-500'">合計：{{scoringUTWeightTotal}}% <span v-if="scoringUTWeightTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
@@ -1335,21 +1367,21 @@
                   <div v-if="scoringAccordion.exam" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
                     <h4 class="text-xs font-semibold text-gray-500 mt-4 mb-2 uppercase tracking-wider">A1 / A2 權重</h4>
                     <div class="grid grid-cols-2 gap-2 sm:gap-3">
-                      <div><label class="text-xs text-gray-500 mb-1 block">A1 常分</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Ratio" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">A2 考試分</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a2Ratio" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">A1 常分</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Ratio" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">A2 考試分</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a2Ratio" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                     </div>
                     <div class="mt-2 text-sm font-medium" :class="scoringA1A2WeightTotal===100?'text-green-600':'text-red-500'">合計：{{scoringA1A2WeightTotal}}% <span v-if="scoringA1A2WeightTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
                     <h4 class="text-xs font-semibold text-gray-500 mt-5 mb-2 uppercase tracking-wider">A1 內部權重</h4>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                      <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.assignment" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.quiz" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">統測(A3)</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.unifiedTest" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.classPerformance" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.assignment" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.quiz" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">統測(A3)</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.unifiedTest" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.classPerformance" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                     </div>
                     <div v-if="scoringCustomCategories.length>0" class="mt-3 pt-3 border-t">
                       <h5 class="text-xs font-semibold text-gray-500 mb-2">A1 自訂類別權重</h5>
                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                        <div v-for="cat in scoringCustomCategories" :key="cat.id"><label class="text-xs text-gray-500 mb-1 block">{{cat.name}}</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.customCategories[cat.id]" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                        <div v-for="cat in scoringCustomCategories" :key="cat.id"><label class="text-xs text-gray-500 mb-1 block">{{cat.name}}</label><div class="flex"><input v-model.number="scoringWeightsLocal.exam.a1Weights.customCategories[cat.id]" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                       </div>
                     </div>
                     <div class="mt-2 text-sm font-medium" :class="scoringA1InternalTotal===scoringWeightsLocal.exam.a1Ratio?'text-green-600':'text-red-500'">合計：{{scoringA1InternalTotal}}% <span v-if="scoringA1InternalTotal!==scoringWeightsLocal.exam.a1Ratio">（應等於 A1 權重 {{scoringWeightsLocal.exam.a1Ratio}}%）</span><i v-else class="fas fa-check ml-1"></i></div>
@@ -1366,8 +1398,8 @@
                   </button>
                   <div v-if="scoringAccordion.yearly" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
                     <div class="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sm:mt-4">
-                      <div><label class="text-xs text-gray-500 mb-1 block">上學期</label><div class="flex"><input v-model.number="scoringWeightsLocal.yearly.t1Weight" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
-                      <div><label class="text-xs text-gray-500 mb-1 block">下學期</label><div class="flex"><input v-model.number="scoringWeightsLocal.yearly.t2Weight" type="number" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">上學期</label><div class="flex"><input v-model.number="scoringWeightsLocal.yearly.t1Weight" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+                      <div><label class="text-xs text-gray-500 mb-1 block">下學期</label><div class="flex"><input v-model.number="scoringWeightsLocal.yearly.t2Weight" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-1 focus:ring-blue-300"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
                     </div>
                     <div class="mt-2 text-sm font-medium" :class="scoringYearlyWeightTotal===100?'text-green-600':'text-red-500'">合計：{{scoringYearlyWeightTotal}}% <span v-if="scoringYearlyWeightTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
                   </div>
@@ -1385,6 +1417,14 @@
               <div class="shrink-0 px-2 sm:px-4 py-2 bg-white border-b flex flex-wrap items-center gap-2">
                 <span class="text-xs sm:text-sm text-gray-600 font-medium">{{gradesTerm?gradesTerm.name:''}} 計算結果</span>
                 <div class="flex-1"></div>
+                <!-- ★ v18: 匯出選單（Excel / PDF） -->
+                <div class="relative">
+                  <button @click.stop="scoringExportMenuOpen=!scoringExportMenuOpen" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs bg-slate-700 text-white rounded-lg hover:bg-slate-800 shadow-sm transition flex items-center gap-1"><i class="fas fa-download"></i>匯出<i class="fas fa-caret-down ml-0.5"></i></button>
+                  <div v-if="scoringExportMenuOpen" class="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg z-30 py-1 w-40" @click.stop>
+                    <button @click="exportScoringResultsExcel" class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"><i class="fas fa-file-excel text-emerald-600 w-4"></i>Excel</button>
+                    <button @click="exportScoringResultsPDF" class="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700"><i class="fas fa-file-pdf text-red-600 w-4"></i>PDF</button>
+                  </div>
+                </div>
                 <div class="relative">
                   <button @click.stop="scoringCopyMenuOpen=!scoringCopyMenuOpen" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"><i class="fas fa-copy mr-1"></i>複製結果</button>
                   <div v-if="scoringCopyMenuOpen" class="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg z-30 p-3 w-48" @click.stop>
@@ -1399,7 +1439,7 @@
               </div>
               <div v-if="scoringResultsData.length===0" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-calculator text-4xl mb-3"></i><p>尚無可計算的數據</p></div></div>
               <div v-else class="flex-1 min-h-0 overflow-auto">
-                <table class="scoring-result-table" style="border-collapse:separate;border-spacing:0;width:max-content;min-width:100%">
+                <table ref="scoringResultsTable" class="scoring-result-table" style="border-collapse:separate;border-spacing:0;width:max-content;min-width:100%">
                   <thead>
                     <tr class="bg-gray-50">
                       <th class="sn-col bg-gray-50 text-gray-500 text-left">學號</th>
@@ -1457,12 +1497,22 @@
             <div v-if="scoringSubTab==='report'" class="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-base sm:text-lg font-bold text-gray-800">全年總分報表</h2>
-                <button @click="scoringCopyReport" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"><i class="fas fa-copy mr-1"></i>複製報表</button>
+                <div class="flex items-center gap-2">
+                  <!-- ★ v18: 匯出選單（Excel / PDF） -->
+                  <div class="relative">
+                    <button @click.stop="scoringExportMenuOpen=!scoringExportMenuOpen" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs bg-slate-700 text-white rounded-lg hover:bg-slate-800 shadow-sm transition flex items-center gap-1"><i class="fas fa-download"></i>匯出<i class="fas fa-caret-down ml-0.5"></i></button>
+                    <div v-if="scoringExportMenuOpen" class="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg z-30 py-1 w-40" @click.stop>
+                      <button @click="exportScoringReportExcel" class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"><i class="fas fa-file-excel text-emerald-600 w-4"></i>Excel</button>
+                      <button @click="exportScoringReportPDF" class="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700"><i class="fas fa-file-pdf text-red-600 w-4"></i>PDF</button>
+                    </div>
+                  </div>
+                  <button @click="scoringCopyReport" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"><i class="fas fa-copy mr-1"></i>複製報表</button>
+                </div>
               </div>
               <div v-if="scoringReportFinalData.length===0" class="text-center text-gray-400 py-12"><i class="fas fa-file-alt text-4xl mb-3"></i><p>尚無可顯示的報表數據</p></div>
               <div v-else>
                 <div class="bg-white rounded-xl shadow overflow-auto mb-4 sm:mb-6">
-                  <table class="w-full text-xs sm:text-sm" style="min-width:700px">
+                  <table ref="scoringReportTable" class="w-full text-xs sm:text-sm" style="min-width:700px">
                     <thead class="bg-gray-50">
                       <tr>
                         <th @click="scoringSortReport('rank')" class="px-2 sm:px-3 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">排名 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
@@ -1785,6 +1835,21 @@
                           <th class="px-2 py-2 text-center whitespace-nowrap">滿分</th>
                           <th class="px-2 py-2 text-center whitespace-nowrap">學生分數</th>
                           <th @click="analysisSortStudentScores('studentPct')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">百分制 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th @click="analysisSortStudentScores('rank')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">名次 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">班級平均</th>
+                          <th @click="analysisSortStudentScores('diff')" class="px-2 py-2 text-center cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">差距 <i class="fas fa-sort text-gray-300 ml-0.5"></i></th>
+                          <th class="px-2 py-2 text-center whitespace-nowrap">表現</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="r in analysisStudentScoresTable" :key="r.id" class="border-t hover:bg-gray-50">
+                          <td class="px-2 py-2 text-gray-500">{{r.termName}}</td>
+                          <td class="px-2 py-2 font-medium text-gray-800">{{r.name}}</td>
+                          <td class="px-2 py-2"><span class="inline-block text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(r.type)">{{r.typeLabel}}</span></td>
+                          <td class="px-2 py-2 text-center text-gray-500">{{r.fullMark}}</td>
+                          <td class="px-2 py-2 text-center font-medium">{{r.studentScore !== null ? r.studentScore : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.studentPct !== null ? r.studentPct.toFixed(1) : '—'}}</td>
+                          <td class="px-2 py-2 text-center">{{r.rank !== null ? r.rank + '/' + r.totalRanked : '—'}}</td>
                           <td class="px-2 py-2 text-center text-gray-500">{{r.classAvgPct !== null ? r.classAvgPct.toFixed(1) : '—'}}</td>
                           <td class="px-2 py-2 text-center" :class="r.diff === null ? 'text-gray-400' : (r.diff > 0 ? 'text-green-600 font-medium' : (r.diff < 0 ? 'text-red-600 font-medium' : 'text-gray-500'))">
                             {{r.diff === null ? '—' : (r.diff > 0 ? '+' : '') + r.diff.toFixed(1)}}
@@ -2194,6 +2259,7 @@
 <script src="js/calendar-module.js"></script>
 <script src="js/crud-module.js"></script>
 <script src="js/analysis-module.js"></script>
+<script src="js/export-module.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
