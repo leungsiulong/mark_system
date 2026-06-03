@@ -16,7 +16,48 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     [v-cloak]{display:none}
-    body{margin:0;font-family:'Segoe UI','Microsoft JhengHei',sans-serif;background:#f3f4f6;overflow:hidden;height:100vh}
+
+    /* =========================================================
+       Dynamic Theme Tokens
+       ========================================================= */
+    :root{
+      --theme-primary:#2563eb;
+      --theme-primary-rgb:37,99,235;
+      --theme-secondary:#38bdf8;
+      --theme-secondary-rgb:56,189,248;
+      --theme-accent:#8b5cf6;
+      --theme-accent-rgb:139,92,246;
+
+      --theme-gradient-from:#1e3a8a;
+      --theme-gradient-to:#38bdf8;
+
+      --theme-bg-1:rgba(37,99,235,0.14);
+      --theme-bg-2:rgba(139,92,246,0.12);
+      --theme-bg-3:rgba(56,189,248,0.10);
+
+      --theme-text:#1d4ed8;
+      --theme-soft-bg:rgba(37,99,235,0.10);
+      --theme-soft-border:rgba(37,99,235,0.32);
+
+      --glass-bg:rgba(255,255,255,0.72);
+      --glass-bg-strong:rgba(255,255,255,0.86);
+      --glass-border:rgba(255,255,255,0.82);
+      --glass-shadow:0 24px 60px rgba(15,23,42,0.08);
+
+      --focus-ring:rgba(37,99,235,0.16);
+    }
+
+    body{
+      margin:0;
+      font-family:'Segoe UI','Microsoft JhengHei',sans-serif;
+      overflow:hidden;height:100vh;
+      background:
+        radial-gradient(circle at 0% 0%, var(--theme-bg-1), transparent 28rem),
+        radial-gradient(circle at 100% 0%, var(--theme-bg-2), transparent 30rem),
+        radial-gradient(circle at 50% 100%, var(--theme-bg-3), transparent 32rem),
+        linear-gradient(135deg, #f8fafc, #eef2ff);
+      background-attachment:fixed;
+    }
     .fade-enter-active,.fade-leave-active{transition:opacity .2s}
     .fade-enter-from,.fade-leave-to{opacity:0}
     .slide-enter-active,.slide-leave-active{transition:transform .2s,opacity .2s}
@@ -48,9 +89,9 @@
     .report-row-highlight-good td{background-color:#dbeafe!important}
     .report-row-highlight-excellent td{background-color:#f3e8ff!important}
     .grades-cell{cursor:cell;min-width:56px;height:32px;transition:background .1s}
-    .grades-cell:hover{background:#f0f9ff}
-    .grades-cell.cell-focused{outline:2px solid #3b82f6;outline-offset:-2px;z-index:2;position:relative}
-    .grades-cell.cell-selected{outline:1px solid #93c5fd;outline-offset:-1px;z-index:1;position:relative}
+    .grades-cell:hover{background:rgba(var(--theme-primary-rgb),0.08)}
+    .grades-cell.cell-focused{outline:2px solid var(--theme-primary);outline-offset:-2px;z-index:2;position:relative}
+    .grades-cell.cell-selected{outline:1px solid rgba(var(--theme-primary-rgb),0.45);outline-offset:-1px;z-index:1;position:relative}
     .grades-cell.cell-warning{background:#fef3c7!important;color:#92400e}
     .grades-cell.cell-fail{background:#fee2e2!important;color:#991b1b}
     .grades-cell.cell-fail.cell-focused{outline-color:#ef4444}
@@ -95,12 +136,12 @@
     .cal-week-day{min-height:200px;display:flex;flex-direction:column}
     .cal-popover{background:#fff;border-radius:12px;box-shadow:0 24px 64px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.06);overflow:hidden;max-width:calc(100vw - 16px)}
     .cal-progress-bar{height:8px;background:#e5e7eb;border-radius:9999px;overflow:hidden}
-    .cal-progress-fill{height:100%;background:linear-gradient(to right,#3b82f6,#60a5fa);transition:width .4s cubic-bezier(0.4,0,0.2,1)}
+    .cal-progress-fill{height:100%;background:linear-gradient(to right,var(--theme-primary),var(--theme-secondary));transition:width .4s cubic-bezier(0.4,0,0.2,1)}
     .seg-track{display:inline-grid;grid-template-columns:1fr 1fr 1fr;background:#e2e8f0;border-radius:9999px;padding:2px;position:relative;min-width:150px;height:28px}
     .seg-thumb-wrap{position:absolute;top:2px;left:2px;bottom:2px;width:calc((100% - 4px)/3);pointer-events:none;transition:transform .25s cubic-bezier(0.4,0,0.2,1)}
-    .seg-thumb-pill{width:100%;height:100%;background:#fff;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
+    .seg-thumb-pill{width:100%;height:100%;background:linear-gradient(135deg,#fff,rgba(var(--theme-primary-rgb),0.10));border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
     .seg-option{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;border-radius:9999px;color:#6b7280;transition:color .2s,transform .1s;user-select:none;border:none;background:none;padding:0 2px}
-    .seg-option.seg-active{color:#1e40af;font-weight:600}
+    .seg-option.seg-active{color:var(--theme-text);font-weight:600}
     .seg-option:not(:disabled):active{transform:scale(.94)}
     .seg-option:disabled{color:#cbd5e1;cursor:not-allowed}
     .scoring-result-table th,.scoring-result-table td{white-space:nowrap;padding:6px 10px;font-size:13px;border-bottom:1px solid #e5e7eb}
@@ -150,11 +191,100 @@
     .settings-back-btn:active{transform:scale(0.97)}
     .year-tab-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-bottom:2px solid transparent;color:#6b7280;font-weight:500;font-size:14px;cursor:pointer;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;margin-bottom:-1px}
     .year-tab-btn:hover{color:#374151;background:#f9fafb}
-    .year-tab-btn.active{color:#1d4ed8;border-bottom-color:#3b82f6;background:#eff6ff}
+    .year-tab-btn.active{color:#fff;border-bottom-color:transparent;background:linear-gradient(135deg,var(--theme-primary),var(--theme-secondary));border-radius:9999px;box-shadow:0 8px 18px rgba(var(--theme-primary-rgb),0.22)}
     .view-toggle-btn{padding:4px 12px;font-size:12px;border-radius:6px;cursor:pointer;transition:all .15s;color:#6b7280;background:transparent;border:none}
-    .view-toggle-btn.active{background:#fff;color:#1f2937;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+    .view-toggle-btn.active{background:#fff;color:var(--theme-text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06),inset 0 0 0 1px rgba(var(--theme-primary-rgb),0.18)}
     .loading-progress{width:240px;height:4px;background:#e5e7eb;border-radius:9999px;overflow:hidden;margin-top:12px}
-    .loading-progress-fill{height:100%;background:linear-gradient(to right,#3b82f6,#60a5fa);transition:width .3s cubic-bezier(0.4,0,0.2,1)}
+    .loading-progress-fill{height:100%;background:linear-gradient(to right,var(--theme-primary),var(--theme-secondary));transition:width .3s cubic-bezier(0.4,0,0.2,1)}
+
+    /* =========================================================
+       Theme-aware Glassmorphism Override
+       ========================================================= */
+    /* 讓全局主題光暈在內容區透出 */
+    .app-main{
+      background:
+        radial-gradient(circle at 12% 0%, rgba(var(--theme-primary-rgb),0.07), transparent 26rem),
+        radial-gradient(circle at 100% 6%, rgba(var(--theme-accent-rgb),0.06), transparent 28rem),
+        transparent;
+    }
+    /* Header glass */
+    .app-header{
+      backdrop-filter:blur(14px);
+      border-bottom:1px solid rgba(255,255,255,0.18);
+      box-shadow:0 12px 32px rgba(var(--theme-primary-rgb),0.18);
+    }
+    /* Top nav inactive hover */
+    .app-nav button:hover{ color:var(--theme-text); background:rgba(var(--theme-primary-rgb),0.06); }
+
+    .glass-card{
+      background:var(--glass-bg-strong)!important;
+      border:1px solid var(--glass-border);
+      box-shadow:var(--glass-shadow);
+      backdrop-filter:blur(10px);
+    }
+
+    /* 主要動作按鈕跟隨主題（語意的 red/green/orange/purple 不受影響） */
+    button.bg-blue-500,
+    button.bg-blue-600{
+      background-image:linear-gradient(135deg,var(--theme-primary),var(--theme-secondary))!important;
+      background-color:var(--theme-primary)!important;
+      border-color:transparent!important;
+      box-shadow:0 10px 22px rgba(var(--theme-primary-rgb),0.20);
+    }
+    button.bg-blue-500:hover,
+    button.bg-blue-600:hover{ filter:brightness(0.95); }
+
+    /* 表單 focus ring 跟隨主題（成績表內嵌輸入框因更高 specificity 不受影響） */
+    input:focus,
+    select:focus,
+    textarea:focus{
+      border-color:rgba(var(--theme-primary-rgb),0.65)!important;
+      box-shadow:0 0 0 3px var(--focus-ring)!important;
+    }
+
+    /* 學期選擇按鈕（active） */
+    .term-btn-active{
+      background:rgba(var(--theme-primary-rgb),0.10)!important;
+      border-color:rgba(var(--theme-primary-rgb),0.38)!important;
+      color:var(--theme-text)!important;
+    }
+
+    /* 月曆主題光暈 + 今日狀態 */
+    .calendar-glass{
+      background:
+        radial-gradient(circle at 15% 0%, rgba(var(--theme-secondary-rgb),0.16), transparent 26rem),
+        radial-gradient(circle at 100% 18%, rgba(var(--theme-accent-rgb),0.14), transparent 24rem),
+        var(--glass-bg-strong)!important;
+      border:1px solid var(--glass-border);
+      backdrop-filter:blur(8px);
+    }
+    .cal-day.cal-today{
+      background:rgba(var(--theme-primary-rgb),0.08)!important;
+      box-shadow:inset 0 0 0 1px var(--theme-primary);
+    }
+    .cal-today-num{
+      color:#fff!important;font-weight:700;
+      background:linear-gradient(135deg,var(--theme-primary),var(--theme-secondary));
+      border-radius:9999px;min-width:18px;height:18px;padding:0 5px;
+      display:inline-flex;align-items:center;justify-content:center;
+    }
+    .cal-week-today{
+      background:rgba(var(--theme-primary-rgb),0.06)!important;
+      border-color:rgba(var(--theme-primary-rgb),0.40)!important;
+    }
+    .cal-week-today-head{
+      background:rgba(var(--theme-primary-rgb),0.12)!important;
+      border-color:rgba(var(--theme-primary-rgb),0.30)!important;
+    }
+    .cal-week-today-label{ color:var(--theme-text)!important; }
+    .cal-week-today-num{ color:var(--theme-primary)!important; }
+
+    /* 設定頁色塊 active 指示 */
+    .theme-swatch-active{
+      border-color:var(--theme-primary)!important;
+      box-shadow:0 0 0 3px var(--focus-ring),0 6px 14px rgba(var(--theme-primary-rgb),0.28)!important;
+    }
+    .theme-preview-card .theme-swatch{width:1.75rem;height:1.75rem;border-radius:0.5rem;box-shadow:0 2px 6px rgba(15,23,42,0.18)}
   </style>
 </head>
 <body>
@@ -810,13 +940,13 @@
 
   <!-- MAIN APP -->
   <div v-if="!loading" class="h-screen flex flex-col">
-    <header :style="headerStyle" class="text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
+    <header :style="headerStyle" class="app-header text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
       <button v-if="currentView!=='home' && currentView!=='settings'" @click="leftPanelOpen=!leftPanelOpen" class="p-1.5 rounded-lg hover:bg-white/20 transition"><i class="fas fa-bars"></i></button>
       <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">成績管理系統</h1>
       <div class="flex-1"></div>
       <div v-if="currentAcademicYear" class="text-xs sm:text-sm opacity-90 hidden sm:block truncate max-w-xs"><span>{{currentAcademicYear.name}}</span><span v-if="currentClass"> / {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></span></div>
     </header>
-    <nav class="bg-white border-b shrink-0 flex overflow-x-auto">
+    <nav class="app-nav bg-white border-b shrink-0 flex overflow-x-auto">
       <button v-for="tab in orderedTabs" :key="tab.key" @click="switchToTab(tab.key)" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition" :class="currentView===tab.key?'':'border-transparent text-gray-500 hover:text-gray-700'" :style="currentView===tab.key?activeTabStyle:{}">
         <i :class="tab.icon" class="text-xs"></i><span>{{tab.label}}</span>
       </button>
@@ -836,7 +966,7 @@
               </div>
               <div v-if="expandedYears[y.id]" class="ml-4">
                 <div v-for="c in y.classes.filter(cc => cc.classType === 'subject' || cc.classType === 'elective')" :key="c.id" @click="selectFromTree(y.id,c.id)" class="flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer text-sm mb-0.5 transition" :class="currentClassId===c.id?'font-semibold':'text-gray-600 hover:bg-gray-50'" :style="currentClassId===c.id?treeActiveStyle:{}">
-                  <i class="fas fa-chalkboard text-xs" :style="{color:currentClassId===c.id?themeColors.accent:'#9ca3af'}"></i>
+                  <i class="fas fa-chalkboard text-xs" :style="{color:currentClassId===c.id?'var(--theme-primary)':'#9ca3af'}"></i>
                   <span class="truncate">{{c.className}}</span><span class="text-xs opacity-60" v-if="c.subject">- {{c.subject}}</span>
                   <span v-if="c.classType === 'elective'" class="ml-0.5 text-xs text-purple-500" title="選修科">★</span>
                   <span class="ml-auto text-xs opacity-50">{{c.students.length}}</span>
@@ -848,7 +978,7 @@
         </aside>
       </transition>
 
-      <main class="flex-1 overflow-y-auto bg-gray-50 min-w-0">
+      <main class="app-main flex-1 overflow-y-auto min-w-0">
 
         <!-- ==================== HOME TAB ==================== -->
         <div v-if="currentView==='home'" class="p-3 sm:p-4 lg:p-6">
@@ -873,7 +1003,7 @@
             </div>
           </div>
 
-          <div class="bg-white rounded-xl shadow p-3 sm:p-4">
+          <div class="calendar-glass rounded-xl shadow p-3 sm:p-4">
             <div class="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
               <div class="flex items-center gap-2 sm:gap-3">
                 <h3 class="text-base sm:text-lg font-bold text-gray-800">
@@ -936,11 +1066,11 @@
               <div class="grid grid-cols-7 border-t border-l">
                 <div v-for="(day, di) in calendarDays" :key="di"
                   class="border-r border-b p-1 cal-day"
-                  :class="{'bg-gray-50/60':!day.isCurrentMonth, 'bg-blue-50/50':day.isCurrentMonth && isToday(day.date)}"
+                  :class="{'bg-gray-50/60':!day.isCurrentMonth, 'cal-today':day.isCurrentMonth && isToday(day.date)}"
                   @click="onCalendarDayClick(day)">
                   <div class="flex items-center justify-between mb-0.5">
                     <div class="text-xs font-medium"
-                      :class="day.isCurrentMonth ? (isToday(day.date) ? 'text-blue-600 font-bold' : 'text-gray-700') : 'text-gray-300'">
+                      :class="day.isCurrentMonth ? (isToday(day.date) ? 'cal-today-num' : 'text-gray-700') : 'text-gray-300'">
                       {{day.date.getDate()}}
                     </div>
                     <button v-if="day.isCurrentMonth" @click.stop="onDayAddClick(day, $event)"
@@ -971,12 +1101,12 @@
               <div class="grid grid-cols-7 gap-1">
                 <div v-for="(d, di) in calendarWeekDays" :key="di"
                   class="cal-week-day rounded-lg border"
-                  :class="isToday(d) ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-gray-200'">
+                  :class="isToday(d) ? 'cal-week-today' : 'bg-white border-gray-200'">
                   <div class="flex items-center justify-between p-2 border-b"
-                    :class="isToday(d) ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-gray-50'">
+                    :class="isToday(d) ? 'cal-week-today-head' : 'border-gray-100 bg-gray-50'">
                     <div>
-                      <div class="text-xs" :class="isToday(d) ? 'text-blue-700 font-semibold' : 'text-gray-500'">週{{dayNames[d.getDay()]}}</div>
-                      <div class="text-lg font-bold" :class="isToday(d) ? 'text-blue-600' : 'text-gray-700'">{{d.getDate()}}</div>
+                      <div class="text-xs" :class="isToday(d) ? 'cal-week-today-label font-semibold' : 'text-gray-500'">週{{dayNames[d.getDay()]}}</div>
+                      <div class="text-lg font-bold" :class="isToday(d) ? 'cal-week-today-num' : 'text-gray-700'">{{d.getDate()}}</div>
                     </div>
                     <button @click="openCalendarAddModal(d)"
                       class="text-gray-400 hover:text-blue-500 p-1.5 rounded hover:bg-white transition" title="新增項目">
@@ -1027,7 +1157,7 @@
           <template v-else>
             <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2">
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
-                <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'bg-blue-50 border-blue-300 text-blue-700 font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
+                <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'term-btn-active font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
 
                 <div class="flex-1"></div>
 
@@ -1281,7 +1411,7 @@
           <template v-else>
             <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2">
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
-                <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'bg-blue-50 border-blue-300 text-blue-700 font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
+                <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'term-btn-active font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
               </div>
               <div class="flex items-center gap-1 flex-wrap">
                 <button @click="scoringSubTab='settings'" class="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg transition" :class="scoringSubTab==='settings'?'bg-blue-500 text-white shadow-sm':'text-gray-600 hover:bg-gray-100'"><i class="fas fa-cog mr-1"></i>計分設定</button>
@@ -1598,7 +1728,7 @@
                 <button v-for="term in currentClass.terms" :key="term.id"
                   @click="gradesSelectTerm(term.id)"
                   class="px-3 py-1 text-sm rounded-lg border transition"
-                  :class="gradesTermId===term.id ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
+                  :class="gradesTermId===term.id ? 'term-btn-active font-semibold' : 'border-gray-200 text-gray-500 hover:bg-gray-50'">
                   {{term.name}}
                 </button>
               </div>
@@ -2226,13 +2356,43 @@
           </div>
 
           <div v-if="settingsCurrentView==='layout'">
+            <!-- ★ v19: 目前主題預覽卡片 -->
+            <div class="theme-preview-card glass-card rounded-xl p-4 mb-5">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base sm:text-lg font-bold text-gray-800"><i class="fas fa-palette mr-1" :style="{color:'var(--theme-primary)'}"></i>目前主題</h2>
+                <span class="text-sm font-semibold px-2.5 py-1 rounded-full" :style="{background:'var(--theme-soft-bg)',color:'var(--theme-text)',boxShadow:'inset 0 0 0 1px var(--theme-soft-border)'}">{{themeColors.name}}</span>
+              </div>
+              <div class="rounded-lg p-4 text-white mb-3" :style="bannerStyle">
+                <div class="font-bold text-lg">主題預覽</div>
+                <div class="text-sm opacity-90">整站介面會跟隨此主題即時變色</div>
+              </div>
+              <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-2">
+                  <span class="theme-swatch" :style="{background:'var(--theme-primary)'}"></span>
+                  <span class="text-xs text-gray-500">主色</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="theme-swatch" :style="{background:'var(--theme-secondary)'}"></span>
+                  <span class="text-xs text-gray-500">輔色</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="theme-swatch" :style="{background:'var(--theme-accent)'}"></span>
+                  <span class="text-xs text-gray-500">點綴</span>
+                </div>
+                <div class="flex items-center gap-2 ml-auto">
+                  <button class="bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm">主要按鈕</button>
+                  <input type="text" placeholder="輸入框 focus 預覽" class="text-xs border border-gray-300 rounded-lg px-2 py-1.5 w-36">
+                </div>
+              </div>
+            </div>
+
             <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-4">主題顏色</h2>
             <h3 class="text-sm font-semibold text-gray-500 mb-2">標準色系</h3>
-            <div class="flex flex-wrap gap-2 mb-4"><button v-for="t in standardThemes" :key="t.key" @click="setTheme(t.key)" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'border-gray-800 ring-2 ring-offset-1':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"></button></div>
+            <div class="flex flex-wrap gap-2 mb-4"><button v-for="t in standardThemes" :key="t.key" @click="setTheme(t.key)" :title="t.name" class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'theme-swatch-active':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"><i v-if="currentTheme===t.key" class="fas fa-check absolute inset-0 flex items-center justify-center text-white text-sm"></i></button></div>
             <h3 class="text-sm font-semibold text-gray-500 mb-2">大地色系</h3>
-            <div class="flex flex-wrap gap-2 mb-4"><button v-for="t in earthThemes" :key="t.key" @click="setTheme(t.key)" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'border-gray-800 ring-2 ring-offset-1':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"></button></div>
+            <div class="flex flex-wrap gap-2 mb-4"><button v-for="t in earthThemes" :key="t.key" @click="setTheme(t.key)" :title="t.name" class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'theme-swatch-active':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"><i v-if="currentTheme===t.key" class="fas fa-check absolute inset-0 flex items-center justify-center text-white text-sm"></i></button></div>
             <h3 class="text-sm font-semibold text-gray-500 mb-2">柔和色系</h3>
-            <div class="flex flex-wrap gap-2 mb-6"><button v-for="t in softThemes" :key="t.key" @click="setTheme(t.key)" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'border-gray-800 ring-2 ring-offset-1':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"></button></div>
+            <div class="flex flex-wrap gap-2 mb-6"><button v-for="t in softThemes" :key="t.key" @click="setTheme(t.key)" :title="t.name" class="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg shadow-sm border-2 transition hover:scale-110" :class="currentTheme===t.key?'theme-swatch-active':'border-transparent'" :style="{background:'linear-gradient(135deg,'+t.gradient[0]+','+t.gradient[1]+')'}"><i v-if="currentTheme===t.key" class="fas fa-check absolute inset-0 flex items-center justify-center text-white text-sm"></i></button></div>
             <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-3">標籤排序</h2>
             <div class="bg-white rounded-xl shadow divide-y"><div v-for="(key,idx) in tabOrder" :key="key" class="flex items-center px-3 sm:px-4 py-2.5"><i :class="getTabDef(key).icon" class="text-gray-400 mr-3 w-5 text-center"></i><span class="flex-1 text-sm font-medium text-gray-700">{{getTabDef(key).label}}</span><button @click="moveTabUp(idx)" :disabled="idx===0" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-up text-xs"></i></button><button @click="moveTabDown(idx)" :disabled="idx===tabOrder.length-1" class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><i class="fas fa-chevron-down text-xs"></i></button></div></div>
           </div>
