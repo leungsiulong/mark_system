@@ -1,5 +1,5 @@
 // ================================================================
-// Main Application (v17 — removed name templates; assignment categories support)
+// Main Application (v18 — export module, touch preview/edit, numeric input)
 // ================================================================
 const { createApp } = Vue;
 
@@ -45,6 +45,10 @@ createApp({
       gradesDragStartCell: null,
       gradesDetailEditFullMark: '',
       gradesDisplayMode: 'raw',
+      // ★ v18: 觸控介面狀態 + 匯出選單
+      gradesIsTouchDevice: false,
+      gradesActivelyEditing: false,
+      gradesExportMenuOpen: false,
       gradesStatRows: [
         { key:'avg', label:'平均' }, { key:'max', label:'最高' }, { key:'min', label:'最低' },
         { key:'median', label:'中位數' }, { key:'stddev', label:'標準差' }, { key:'count', label:'已輸入' }
@@ -55,6 +59,7 @@ createApp({
       scoringSaveStatus: '',
       scoringTooltip: null,
       scoringCopyMenuOpen: false,
+      scoringExportMenuOpen: false, // ★ v18
       scoringCopyColumns: { a3: true, a1: false, a2: false, examTotal: true },
       scoringReportSortKey: 'className',
       scoringReportSortAsc: true,
@@ -314,7 +319,7 @@ createApp({
   },
 
   methods: {
-    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods,
+    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods,
 
     switchToTab(key) {
       if (key === 'settings') this.settingsNav = [];
@@ -550,6 +555,8 @@ createApp({
         .grades-table tr.row-hover-highlight .frozen-name,
         .grades-table tr.row-hover-highlight .frozen-class { background:#eff6ff !important; transition: background-color .12s }
         .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
+        /* ★ v18: 觸控預覽模式（已選取但未編輯）以較明顯外框提示 */
+        .grades-touch-device .grades-cell.cell-focused{outline:2px solid #2563eb!important;outline-offset:-2px}
       `;
       document.head.appendChild(style);
     }
@@ -557,6 +564,9 @@ createApp({
 
   async mounted() {
     if(window.innerWidth<1024) this.leftPanelOpen=false;
+    // ★ v18: 觸控介面偵測（粗指標 = 觸控螢幕）
+    this.gradesIsTouchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    if (this.gradesIsTouchDevice) document.body.classList.add('grades-touch-device');
     this._injectCustomStyles();
     this._analysisCharts = {};
     await this.loadAllData();
@@ -601,6 +611,8 @@ createApp({
       this.gradesHeaderMenu = null;
       this.scoringCopyMenuOpen = false;
       this.scoringTooltip = null;
+      this.gradesExportMenuOpen = false;   // ★ v18
+      this.scoringExportMenuOpen = false;  // ★ v18
       if (this.gradesDetailPanel) {
         if (!this._panelMousedownInside && !this._panelMouseupInside) {
           this.gradesDetailPanel = null;

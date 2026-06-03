@@ -1,6 +1,6 @@
 // ================================================================
-// Grades Module (v14 — auto-scroll focused cell into view +
-//                       uniform assignment column width)
+// Grades Module (v15 — touch: tap-to-preview then tap-to-edit;
+//                       numeric keyboard via inputmode on cell input)
 // ================================================================
 
 const GradesMethods = {
@@ -28,6 +28,7 @@ const GradesMethods = {
     this.gradesHoverRow = -1;
     this.gradesIsDragging = false;
     this.gradesDragStartCell = null;
+    this.gradesActivelyEditing = false; // ★ v15
   },
 
   gradesFocusCell(row, col, extend) {
@@ -56,11 +57,14 @@ const GradesMethods = {
       this.gradesSelEnd = { row, col };
     } else { this.gradesSelStart = { row, col }; this.gradesSelEnd = { row, col }; }
     this.$nextTick(() => {
-      const input = this.$refs.gradesEditInput;
-      const el = Array.isArray(input) ? input[0] : input;
-      if (el) {
-        if (document.activeElement !== el) el.focus({ preventScroll: true });
-        if (!isSameCell) { try { el.select(); } catch (e) {} }
+      // ★ v15: 觸控且尚未進入編輯模式時，只做預覽，不聚焦輸入框（不彈鍵盤）
+      if (!this.gradesIsTouchDevice || this.gradesActivelyEditing) {
+        const input = this.$refs.gradesEditInput;
+        const el = Array.isArray(input) ? input[0] : input;
+        if (el) {
+          if (document.activeElement !== el) el.focus({ preventScroll: true });
+          if (!isSameCell) { try { el.select(); } catch (e) {} }
+        }
       }
       // ★ v14: keep the focused cell visible (auto-scroll)
       this.gradesScrollFocusedIntoView();
@@ -84,18 +88,15 @@ const GradesMethods = {
     const wrapRect = wrapper.getBoundingClientRect();
     const cellRect = cell.getBoundingClientRect();
 
-    // total width of the frozen left columns (so we don't hide the cell behind them)
     let frozenLeft = 0;
     rowEl.querySelectorAll('.frozen-sn, .frozen-name, .frozen-class').forEach(fc => { frozenLeft += fc.offsetWidth; });
 
-    // sticky header height (so we don't hide the cell behind it)
     const thead = wrapper.querySelector('thead');
     let headerH = 0;
     if (thead) headerH = thead.getBoundingClientRect().height;
 
     const margin = 6;
 
-    // Horizontal
     const visLeft = wrapRect.left + frozenLeft;
     const visRight = wrapRect.right;
     if (cellRect.left < visLeft) {
@@ -104,7 +105,6 @@ const GradesMethods = {
       wrapper.scrollLeft += (cellRect.right - visRight) + margin;
     }
 
-    // Vertical
     const visTop = wrapRect.top + headerH;
     const visBottom = wrapRect.bottom;
     if (cellRect.top < visTop) {
@@ -115,6 +115,8 @@ const GradesMethods = {
   },
 
   gradesOnCellMouseDown(ri, ci, ev) {
+    // ★ v15: 觸控介面改由 click 處理（單擊預覽、再擊編輯），mousedown 不處理
+    if (this.gradesIsTouchDevice) return;
     if (ev.button !== 0) return;
     if (this.gradesFocusRow === ri && this.gradesFocusCol === ci && ev.target && ev.target.tagName === 'INPUT') {
       return;
@@ -141,6 +143,44 @@ const GradesMethods = {
     } else {
       this.gradesFocusCell(ri, ci);
     }
+  },
+
+  // ★ v15: 觸控點擊入口
+  gradesOnCellClick(ri, ci, ev) {
+    if (!this.gradesIsTouchDevice) return; // 桌面用 mousedown 即時編輯
+    this.gradesHandleTouchTap(ri, ci, ev);
+  },
+
+  // ★ v15: 觸控「單擊預覽、再擊編輯」邏輯
+  gradesHandleTouchTap(ri, ci) {
+    const col = this.gradesOrderedColumns[ci];
+    if (!col) return;
+
+    if (col.readOnly) {
+      this.gradesSaveCurrentCell();
+      this.gradesActivelyEditing = false;
+      this.gradesFocusRow = -1; this.gradesFocusCol = -1;
+      this.gradesEditValue = ''; this.gradesCellOriginalValue = '';
+      this.gradesHeaderMenu = null; this.gradesDetailPanel = null;
+      this.gradesSelStart = { row: ri, col: ci };
+      this.gradesSelEnd = { row: ri, col: ci };
+      return;
+    }
+
+    const isSameCell = (this.gradesFocusRow === ri && this.gradesFocusCol === ci);
+    if (isSameCell) {
+      if (!this.gradesActivelyEditing) {
+        // 第二次點擊同一格 → 進入編輯模式（彈出數字鍵盤）
+        this.gradesActivelyEditing = true;
+        this.gradesFocusCell(ri, ci);
+      }
+      // 已在編輯中：交由原生輸入框處理游標
+      return;
+    }
+
+    // 第一次點擊新格 → 預覽（選取但不編輯、不彈鍵盤）
+    this.gradesActivelyEditing = false;
+    this.gradesFocusCell(ri, ci);
   },
 
   gradesParseInputValue(str, colSpec) {
@@ -471,6 +511,7 @@ const GradesMethods = {
     this.gradesEditValue = ''; this.gradesCellOriginalValue = '';
     this.gradesHeaderMenu = null; this.gradesDetailPanel = null;
     this.gradesSelStart = null; this.gradesSelEnd = null;
+    this.gradesActivelyEditing = false; // ★ v15
     this.$nextTick(() => { if (this.$refs.gradesWrapper) this.$refs.gradesWrapper.focus({ preventScroll: true }); });
   },
 
@@ -478,7 +519,11 @@ const GradesMethods = {
     this._gradesBlurTimer = setTimeout(() => {
       this._gradesBlurTimer = null;
       const wrapper = this.$refs.gradesWrapper;
-      if (wrapper && !wrapper.contains(document.activeElement)) this.gradesSaveCurrentCell();
+      // ★ v15: 只有焦點真正離開表格時才結束編輯狀態（在格與格之間移動時保持編輯）
+      if (wrapper && !wrapper.contains(document.activeElement)) {
+        this.gradesSaveCurrentCell();
+        this.gradesActivelyEditing = false;
+      }
     }, 150);
   },
 
@@ -870,6 +915,8 @@ const GradesMethods = {
     const tR = this.gradesSortedStudents.length;
     const tC = this.gradesOrderedColumns.length;
     if (!tR || !tC) return;
+    // ★ v15: 有實體鍵盤事件時（如外接 iPad 鍵盤）視為編輯意圖
+    if (this.gradesIsTouchDevice) this.gradesActivelyEditing = true;
     if (this.gradesFocusRow < 0 || this.gradesFocusCol < 0) {
       if (tR > 0 && tC > 0) {
         let fc = 0;
@@ -1029,8 +1076,6 @@ const GradesComputed = {
     for (const k in grouped) grouped[k].sort((a, b) => (a.order || 0) - (b.order || 0));
     for (const k in customGroups) customGroups[k].sort((a, b) => (a.order || 0) - (b.order || 0));
     const customCats = (this.currentClass?.customCategories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-    // ★ v13: order assignments by their assignment category (so the category
-    // header row groups them consecutively), categorised first then uncategorised
     const asgCats = (this.currentClass?.assignmentCategories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
     let orderedAssignments = grouped.assignment;
     if (asgCats.length > 0) {
@@ -1076,20 +1121,15 @@ const GradesComputed = {
     return headers;
   },
 
-  // ★ v13: whether to render the assignment-category header row
   gradesHasAsgCat() {
     if (!this.gradesTerm) return false;
     return (this.gradesTerm.assessments || []).some(a => a.type === 'assignment' && a.assignmentCategoryId);
   },
 
-  // ★ v13: total number of header rows (drives frozen-column rowspan)
   gradesHeaderRowspan() {
     return 3 + (this.gradesHasAsgCat ? 1 : 0) + (this.gradesNeedsRow4 ? 1 : 0);
   },
 
-  // ★ v13: segments for the assignment-category row. Assignment columns are
-  // grouped by category; non-assignment columns emit their assessment-name cell
-  // with rowspan=2 so they align with the (lower) assignment name row.
   gradesCategoryRowSegments() {
     const headers = this.gradesAssessmentHeaders;
     const segs = [];
@@ -1114,7 +1154,6 @@ const GradesComputed = {
     return segs;
   },
 
-  // ★ v13: assignment-only name headers with per-category occurrence count
   gradesAssignmentNameHeaders() {
     const headers = this.gradesAssessmentHeaders.filter(h => h.assessment.type === 'assignment');
     const counters = {};
@@ -1349,7 +1388,6 @@ const GradesComputed = {
     return null;
   },
 
-  // ★ v13: assignment categories for the currently-open assessment modal
   modalAssignmentCategories() {
     const yId = this.modalData.yearId || this.currentAcademicYearId;
     const cId = this.modalData.classId || this.currentClassId;
