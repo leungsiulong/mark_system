@@ -1,6 +1,6 @@
 // ================================================================
-// Grades Module (v12 — uncapped ranking & stats so bonus scores rank correctly,
-//                       e.g. 110/100 ranks higher than 105/100)
+// Grades Module (v14 — auto-scroll focused cell into view +
+//                       uniform assignment column width)
 // ================================================================
 
 const GradesMethods = {
@@ -62,7 +62,56 @@ const GradesMethods = {
         if (document.activeElement !== el) el.focus({ preventScroll: true });
         if (!isSameCell) { try { el.select(); } catch (e) {} }
       }
+      // ★ v14: keep the focused cell visible (auto-scroll)
+      this.gradesScrollFocusedIntoView();
     });
+  },
+
+  // ★ v14: scroll so the currently focused cell is fully visible inside the
+  // scroll container, accounting for the sticky header row and the frozen
+  // (學號 / 姓名 / 班別) columns on the left.
+  gradesScrollFocusedIntoView() {
+    const wrapper = this.$refs.gradesWrapper;
+    if (!wrapper) return;
+    const row = this.gradesFocusRow, col = this.gradesFocusCol;
+    if (row < 0 || col < 0) return;
+    const rowEls = wrapper.querySelectorAll('tbody tr');
+    const rowEl = rowEls[row];
+    if (!rowEl) return;
+    const cell = rowEl.querySelector('[data-acol="' + col + '"]');
+    if (!cell) return;
+
+    const wrapRect = wrapper.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+
+    // total width of the frozen left columns (so we don't hide the cell behind them)
+    let frozenLeft = 0;
+    rowEl.querySelectorAll('.frozen-sn, .frozen-name, .frozen-class').forEach(fc => { frozenLeft += fc.offsetWidth; });
+
+    // sticky header height (so we don't hide the cell behind it)
+    const thead = wrapper.querySelector('thead');
+    let headerH = 0;
+    if (thead) headerH = thead.getBoundingClientRect().height;
+
+    const margin = 6;
+
+    // Horizontal
+    const visLeft = wrapRect.left + frozenLeft;
+    const visRight = wrapRect.right;
+    if (cellRect.left < visLeft) {
+      wrapper.scrollLeft -= (visLeft - cellRect.left) + margin;
+    } else if (cellRect.right > visRight) {
+      wrapper.scrollLeft += (cellRect.right - visRight) + margin;
+    }
+
+    // Vertical
+    const visTop = wrapRect.top + headerH;
+    const visBottom = wrapRect.bottom;
+    if (cellRect.top < visTop) {
+      wrapper.scrollTop -= (visTop - cellRect.top) + margin;
+    } else if (cellRect.bottom > visBottom) {
+      wrapper.scrollTop += (cellRect.bottom - visBottom) + margin;
+    }
   },
 
   gradesOnCellMouseDown(ri, ci, ev) {
@@ -184,15 +233,13 @@ const GradesMethods = {
   },
 
   // ★ v16: Returns the UNCAPPED numeric value of a cell, used for ranking and
-  // percent display. For `simple` columns with bonus, this includes the bonus
-  // beyond fullMark, so e.g. 110/100 correctly outranks 105/100.
+  // percent display.
   gradesGetEffectiveValueForRanking(studentId, ci) {
     const col = this.gradesOrderedColumns[ci];
     if (!col) return null;
     const a = col.assessment;
 
     if (col.colType === 'simple') {
-      // ★ v16: NO CAPPING — bonus and over-fullmark scores rank correctly
       const v = (a.scores || {})[studentId];
       if (v == null) return null;
       if (typeof v === 'object' && v !== null) {
@@ -209,8 +256,6 @@ const GradesMethods = {
     }
     if (col.colType === 'subitem-total' || col.colType === 'exam-adjusted-total' ||
         col.colType === 'paper-total' || col.colType === 'exam-papers-total') {
-      // For computed totals (sub-items, adjusted exam, papers), use the stored
-      // value as-is. These are already capped during their own computation.
       const v = (a.scores || {})[studentId];
       if (v == null) return null;
       if (typeof v === 'object') {
@@ -256,7 +301,6 @@ const GradesMethods = {
       if (!col || !col.fullMark || col.fullMark <= 0) {
         return this.gradesGetDisplayScore(studentId, ci);
       }
-      // ★ v16: Uses uncapped value, so 110/100 displays as 110.0%
       const v = this.gradesGetEffectiveValueForRanking(studentId, ci);
       if (v === null || v === undefined || isNaN(v)) return '';
       return ((v / col.fullMark) * 100).toFixed(1);
@@ -548,6 +592,8 @@ const GradesMethods = {
       }
     }
     if (this.gradesHighlightUnenteredCol === ci && (disp === '' || disp == null)) cls += ' cell-unentered';
+    // ★ v14: uniform width for assignment (simple) columns
+    if (col.colType === 'simple' && col.assessment.type === 'assignment') cls += ' grades-col-asmt';
     return cls;
   },
 
@@ -647,6 +693,8 @@ const GradesMethods = {
       fullMark: a.fullMark,
       date: a.date || '',
       notes: a.notes || '',
+      assignmentCategoryId: a.assignmentCategoryId || '',
+      _newAsgCatName: '',
       hasSubItems: a.hasSubItems || false,
       subItems: a.hasSubItems ? JSON.parse(JSON.stringify(a.subItems || [])) : [],
       hasAdjustedPaper: a.hasAdjustedPaper || false,
@@ -893,6 +941,8 @@ const GradesMethods = {
       fullMark: a.fullMark,
       date: a.date || '',
       notes: a.notes || '',
+      assignmentCategoryId: a.assignmentCategoryId || '',
+      _newAsgCatName: '',
       hasSubItems: a.hasSubItems || false,
       subItems: a.hasSubItems ? JSON.parse(JSON.stringify(a.subItems || [])) : [],
       hasAdjustedPaper: a.hasAdjustedPaper || false,
@@ -979,7 +1029,24 @@ const GradesComputed = {
     for (const k in grouped) grouped[k].sort((a, b) => (a.order || 0) - (b.order || 0));
     for (const k in customGroups) customGroups[k].sort((a, b) => (a.order || 0) - (b.order || 0));
     const customCats = (this.currentClass?.customCategories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-    const result = [...grouped.assignment, ...grouped.quiz];
+    // ★ v13: order assignments by their assignment category (so the category
+    // header row groups them consecutively), categorised first then uncategorised
+    const asgCats = (this.currentClass?.assignmentCategories || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    let orderedAssignments = grouped.assignment;
+    if (asgCats.length > 0) {
+      const buckets = {};
+      const none = [];
+      for (const a of grouped.assignment) {
+        if (a.assignmentCategoryId && asgCats.find(c => c.id === a.assignmentCategoryId)) {
+          if (!buckets[a.assignmentCategoryId]) buckets[a.assignmentCategoryId] = [];
+          buckets[a.assignmentCategoryId].push(a);
+        } else none.push(a);
+      }
+      orderedAssignments = [];
+      for (const cc of asgCats) { if (buckets[cc.id]) orderedAssignments.push(...buckets[cc.id]); }
+      orderedAssignments.push(...none);
+    }
+    const result = [...orderedAssignments, ...grouped.quiz];
     for (const cc of customCats) { if (customGroups[cc.id]) result.push(...customGroups[cc.id]); }
     result.push(...grouped.cp_ut, ...grouped.unified_test, ...grouped.cp_exam, ...grouped.exam);
     return result;
@@ -1007,6 +1074,56 @@ const GradesComputed = {
       i = j;
     }
     return headers;
+  },
+
+  // ★ v13: whether to render the assignment-category header row
+  gradesHasAsgCat() {
+    if (!this.gradesTerm) return false;
+    return (this.gradesTerm.assessments || []).some(a => a.type === 'assignment' && a.assignmentCategoryId);
+  },
+
+  // ★ v13: total number of header rows (drives frozen-column rowspan)
+  gradesHeaderRowspan() {
+    return 3 + (this.gradesHasAsgCat ? 1 : 0) + (this.gradesNeedsRow4 ? 1 : 0);
+  },
+
+  // ★ v13: segments for the assignment-category row. Assignment columns are
+  // grouped by category; non-assignment columns emit their assessment-name cell
+  // with rowspan=2 so they align with the (lower) assignment name row.
+  gradesCategoryRowSegments() {
+    const headers = this.gradesAssessmentHeaders;
+    const segs = [];
+    let i = 0;
+    while (i < headers.length) {
+      const h = headers[i];
+      if (h.assessment.type === 'assignment') {
+        const catId = h.assessment.assignmentCategoryId || null;
+        let colspan = h.colspan, startCol = h.startCol, j = i + 1;
+        while (j < headers.length && headers[j].assessment.type === 'assignment' &&
+               (headers[j].assessment.assignmentCategoryId || null) === catId) {
+          colspan += headers[j].colspan; j++;
+        }
+        const cat = (this.currentClass?.assignmentCategories || []).find(c => c.id === catId);
+        segs.push({ kind: 'category', label: cat ? cat.name : '未分類', isNone: !cat, colspan, startCol });
+        i = j;
+      } else {
+        segs.push({ kind: 'assessment', assessment: h.assessment, colspan: h.colspan, startCol: h.startCol });
+        i++;
+      }
+    }
+    return segs;
+  },
+
+  // ★ v13: assignment-only name headers with per-category occurrence count
+  gradesAssignmentNameHeaders() {
+    const headers = this.gradesAssessmentHeaders.filter(h => h.assessment.type === 'assignment');
+    const counters = {};
+    return headers.map(h => {
+      const catId = h.assessment.assignmentCategoryId || null;
+      let count = null;
+      if (catId) { counters[catId] = (counters[catId] || 0) + 1; count = counters[catId]; }
+      return { assessment: h.assessment, colspan: h.colspan, startCol: h.startCol, count };
+    });
   },
 
   gradesColumnGroups() {
@@ -1109,10 +1226,6 @@ const GradesComputed = {
     return arr;
   },
 
-  // ★ v16: Compute ranks for every column using UNCAPPED values (via
-  // gradesGetEffectiveValueForRanking). When several students exceed the
-  // full mark (e.g. due to bonus), they no longer all tie at #1 — instead
-  // they're ranked by their actual (uncapped) score, so 110 > 105 > 100.
   gradesAllColumnRanks() {
     const cols = this.gradesOrderedColumns;
     const stu = this.gradesSortedStudents;
@@ -1139,9 +1252,6 @@ const GradesComputed = {
     return { raw: 0, percent: 1, rank: 2 }[this.gradesDisplayMode] || 0;
   },
 
-  // ★ v16: Stats now also use UNCAPPED values for `simple` columns, so the
-  // max stat correctly reflects bonus-inflated scores (e.g. shows 110 when
-  // a student got 110/100). This is consistent with the ranking change above.
   gradesStatsData() {
     const cols = this.gradesOrderedColumns;
     const stu = this.gradesSortedStudents;
@@ -1166,7 +1276,6 @@ const GradesComputed = {
         let n;
         if (col.colType === 'simple') {
           const rawV = (col.assessment.scores || {})[s.id];
-          // ★ v16: UNCAPPED — bonus contributes to averages and max/median
           if (typeof rawV === 'object' && rawV !== null) n = (rawV.base||0)+(rawV.bonus||0);
           else n = parseFloat(rawV);
         } else {
@@ -1238,6 +1347,14 @@ const GradesComputed = {
       };
     }
     return null;
+  },
+
+  // ★ v13: assignment categories for the currently-open assessment modal
+  modalAssignmentCategories() {
+    const yId = this.modalData.yearId || this.currentAcademicYearId;
+    const cId = this.modalData.classId || this.currentClassId;
+    const cls = this.getClassObj(yId, cId);
+    return cls ? (cls.assignmentCategories || []) : [];
   },
 
   gradesAutoFailPercent() {

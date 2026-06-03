@@ -1,5 +1,6 @@
 // ================================================================
-// CRUD Operations (v10 — name templates, fullMarkS2 support)
+// CRUD Operations (v11 — assignment categories, blank default name,
+//                        assignment default fullMark = 10, removed name templates)
 // ================================================================
 const CrudMethods = {
 
@@ -27,10 +28,6 @@ const CrudMethods = {
           this.tabOrder = valid;
         }
         if (d.activeQuickNavKeys && Array.isArray(d.activeQuickNavKeys)) this.activeQuickNavKeys = d.activeQuickNavKeys;
-        // ★ v14: Load name templates from settings/main
-        if (d.nameTemplates && Array.isArray(d.nameTemplates)) {
-          this.nameTemplates = d.nameTemplates;
-        }
       }
 
       this.globalStudents = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -56,6 +53,8 @@ const CrudMethods = {
         year.classes = cs.docs.map(cD => {
           const cls = { id: cD.id, ...cD.data(), students: [], terms: [], _yearId: yD.id };
           if (!cls.customCategories) cls.customCategories = [];
+          // ★ v13: assignment categories
+          if (!cls.assignmentCategories) cls.assignmentCategories = [];
 
           if (!cls.classType) {
             cls.classType = cls.subject ? 'subject' : 'regular';
@@ -162,6 +161,23 @@ const CrudMethods = {
       (c.classType === 'regular' || c.classType === 'subject'));
   },
 
+  // ★ v13: create (or reuse by name) an assignment category on a class
+  async _ensureAssignmentCategory(yearId, classId, name) {
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return null;
+    if (!cls.assignmentCategories) cls.assignmentCategories = [];
+    const existing = cls.assignmentCategories.find(c => c.name === name);
+    if (existing) return existing.id;
+    const catId = 'ac_' + Date.now() + '_' + Math.random().toString(36).substr(2,5);
+    cls.assignmentCategories.push({ id: catId, name, order: cls.assignmentCategories.length });
+    try {
+      await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).update({
+        assignmentCategories: cls.assignmentCategories
+      });
+    } catch (e) { console.error('save assignment category failed', e); }
+    return catId;
+  },
+
   async addAcademicYear() {
     const name = (this.modalData.name || '').trim();
     if (!name) { this.addToast('請輸入學年名稱', 'warning'); return; }
@@ -265,6 +281,7 @@ const CrudMethods = {
       className: className.trim(), subject: subjectName, scoreConfig: dc,
       classType: type,
       customCategories: [],
+      assignmentCategories: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
@@ -280,7 +297,7 @@ const CrudMethods = {
 
     const nc = {
       id: dr.id, className: className.trim(), subject: subjectName,
-      classType: type, scoreConfig: dc, customCategories: [], createdAt: new Date(),
+      classType: type, scoreConfig: dc, customCategories: [], assignmentCategories: [], createdAt: new Date(),
       students: [],
       terms: terms
     };
@@ -363,6 +380,7 @@ const CrudMethods = {
         scoreConfig: dc,
         classType: 'subject',
         customCategories: [],
+        assignmentCategories: [],
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       const cr = db.collection('academicYears').doc(yearId).collection('classes').doc(dr.id);
@@ -379,6 +397,7 @@ const CrudMethods = {
         classType: 'subject',
         scoreConfig: dc,
         customCategories: [],
+        assignmentCategories: [],
         createdAt: new Date(),
         students: [],
         terms: [
@@ -736,38 +755,50 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
+  // ★ v11: name default blank (teacher input); assignment default fullMark = 10
   openAddAssessmentModal(type, period, customCategoryId) {
     if (!this.gradesTerm) return;
-    const term = this.gradesTerm; const all = term.assessments || [];
-    let name = '';
-    if (type === 'assignment') name = '課業' + (all.filter(a => a.type === 'assignment').length + 1);
-    else if (type === 'quiz') name = '小測' + (all.filter(a => a.type === 'quiz').length + 1);
-    else if (type === 'unified_test') name = '統測';
-    else if (type === 'exam') name = '考試';
-    else if (type === 'class_performance') name = period === 'exam' ? '考試期課堂表現' : '統測期課堂表現';
-    else if (type === 'custom' && customCategoryId) {
-      const cat = (this.currentClass.customCategories || []).find(c => c.id === customCategoryId);
-      const count = all.filter(a => a.type === 'custom' && a.customCategoryId === customCategoryId).length;
-      name = (cat ? cat.name : '自訂') + (count + 1);
-    }
     this.openModal('addAssessment', {
       type, period: period || null, customCategoryId: customCategoryId || null,
-      name, fullMark: 100, date: '', notes: '',
+      name: '',
+      fullMark: type === 'assignment' ? 10 : 100,
+      date: '', notes: '',
+      assignmentCategoryId: '', _newAsgCatName: '',
       hasSubItems: false, subItems: [],
       hasAdjustedPaper: false, adjustedMultiplier: 80, passingScore: 50,
-      fullMarkS2: '', // ★ v14
+      fullMarkS2: '',
       hasMultiplePapers: false, papers: [],
       yearId: this.currentAcademicYearId, classId: this.currentClassId, termId: this.gradesTermId
     });
   },
 
   async addAssessmentConfirm() {
-    const { type, period, customCategoryId, name, fullMark, date, notes, yearId, classId, termId,
+    const { type, period, customCategoryId, fullMark, date, notes, yearId, classId, termId,
       hasSubItems, subItems,
       hasAdjustedPaper, adjustedMultiplier, passingScore, fullMarkS2,
       hasMultiplePapers, papers } = this.modalData;
-    if (!name.trim()) { this.addToast('請輸入名稱', 'warning'); return; }
+
+    const cls = this.getClassObj(yearId, classId);
+    const term = cls?.terms?.find(t => t.id === termId);
+    if (!term) { this.addToast('找不到學期', 'error'); return; }
+
+    // ★ v11: name can be blank → auto-generate
+    let aName = (this.modalData.name || '').trim();
+    if (!aName) {
+      const all = term.assessments || [];
+      if (type === 'assignment') aName = '課業' + (all.filter(a => a.type === 'assignment').length + 1);
+      else if (type === 'quiz') aName = '小測' + (all.filter(a => a.type === 'quiz').length + 1);
+      else if (type === 'unified_test') aName = '統測';
+      else if (type === 'exam') aName = '考試';
+      else if (type === 'class_performance') aName = period === 'exam' ? '考試期課堂表現' : '統測期課堂表現';
+      else if (type === 'custom' && customCategoryId) {
+        const cat = (cls.customCategories || []).find(c => c.id === customCategoryId);
+        aName = (cat ? cat.name : '自訂') + (all.filter(a => a.type === 'custom' && a.customCategoryId === customCategoryId).length + 1);
+      } else aName = '項目';
+    }
+
     const fm = parseInt(fullMark); if (isNaN(fm) || fm <= 0) { this.addToast('請輸入有效的滿分', 'warning'); return; }
+
     let finalSubItems = [];
     if (hasSubItems) {
       if (!subItems || subItems.length === 0) { this.addToast('請至少新增一個小項目', 'warning'); return; }
@@ -794,7 +825,6 @@ const CrudMethods = {
           id: (p.id && !String(p.id).startsWith('new_')) ? p.id : ('pap_' + Date.now() + '_' + Math.random().toString(36).substr(2,5)),
           name: p.name.trim(), fullMark: pfm, weight: pw, order: finalPapers.length
         };
-        // ★ v14: Per-paper Set 2 fullMark (only when adjusted paper enabled)
         const pfmS2 = parseFloat(p.fullMarkS2);
         if (hasAdjustedPaper && !isNaN(pfmS2) && pfmS2 > 0 && pfmS2 !== pfm) {
           paperObj.fullMarkS2 = pfmS2;
@@ -802,23 +832,33 @@ const CrudMethods = {
         finalPapers.push(paperObj);
       }
     }
-    const cls = this.getClassObj(yearId, classId); const term = cls?.terms?.find(t => t.id === termId); if (!term) return;
+
+    // ★ v13: resolve assignment category (supports inline-created category)
+    let asgCatId = null;
+    if (type === 'assignment') {
+      asgCatId = this.modalData.assignmentCategoryId || null;
+      if (asgCatId === '__new__') {
+        const nm = (this.modalData._newAsgCatName || '').trim();
+        asgCatId = nm ? await this._ensureAssignmentCategory(yearId, classId, nm) : null;
+      }
+    }
+
     const order = Date.now();
     const data = {
-      type, name: name.trim(), fullMark: fm, date: date || null, notes: (notes || '').trim(),
+      type, name: aName, fullMark: fm, date: date || null, notes: (notes || '').trim(),
       includeInUT: true, includeInExam: true, scores: {}, order,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (type === 'assignment' || type === 'quiz' || type === 'custom') data.scoreCategory = 'none';
     if (type === 'class_performance') data.period = period;
     if (type === 'custom') data.customCategoryId = customCategoryId;
+    if (type === 'assignment' && asgCatId) data.assignmentCategoryId = asgCatId;
     if (hasSubItems && finalSubItems.length > 0) { data.hasSubItems = true; data.subItems = finalSubItems; data.subItemScores = {}; }
     if (type === 'exam') {
       if (hasAdjustedPaper) {
         data.hasAdjustedPaper = true;
         data.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
         data.passingScore = parseFloat(passingScore) || 50;
-        // ★ v14: Top-level Set 2 fullMark (only meaningful when not multi-paper)
         const fmS2Val = parseFloat(fullMarkS2);
         if (!hasMultiplePapers && !isNaN(fmS2Val) && fmS2Val > 0 && fmS2Val !== fm) {
           data.fullMarkS2 = fmS2Val;
@@ -834,7 +874,7 @@ const CrudMethods = {
     const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').add(data);
     if (!term.assessments) term.assessments = [];
     term.assessments.push({ id: dr.id, ...data, createdAt: new Date() });
-    this.closeModal(); this.addToast('已新增「' + name.trim() + '」', 'success');
+    this.closeModal(); this.addToast('已新增「' + aName + '」', 'success');
   },
 
   async updateAssessmentConfirm() {
@@ -895,6 +935,17 @@ const CrudMethods = {
     a.date = date || null;
     a.notes = (notes || '').trim();
 
+    // ★ v13: assignment category update
+    if (a.type === 'assignment') {
+      let asgCatId = this.modalData.assignmentCategoryId || null;
+      if (asgCatId === '__new__') {
+        const nm = (this.modalData._newAsgCatName || '').trim();
+        asgCatId = nm ? await this._ensureAssignmentCategory(yearId, classId, nm) : null;
+      }
+      if (asgCatId) a.assignmentCategoryId = asgCatId;
+      else delete a.assignmentCategoryId;
+    }
+
     if (hasSubItems) {
       a.hasSubItems = true;
       a.subItems = finalSubItems;
@@ -919,7 +970,6 @@ const CrudMethods = {
         a.hasAdjustedPaper = true;
         a.adjustedMultiplier = parseFloat(adjustedMultiplier) || 80;
         a.passingScore = parseFloat(passingScore) || 50;
-        // ★ v14: handle fullMarkS2
         const fmS2Val = parseFloat(fullMarkS2);
         if (!hasMultiplePapers && !isNaN(fmS2Val) && fmS2Val > 0 && fmS2Val !== fm) {
           a.fullMarkS2 = fmS2Val;
@@ -982,6 +1032,12 @@ const CrudMethods = {
       notes: (notes || '').trim(),
       scores: a.scores || {}
     };
+
+    // ★ v13: persist assignment category
+    if (a.type === 'assignment') {
+      if (a.assignmentCategoryId) updateData.assignmentCategoryId = a.assignmentCategoryId;
+      else updateData.assignmentCategoryId = firebase.firestore.FieldValue.delete();
+    }
 
     if (a.hasSubItems) {
       updateData.hasSubItems = true;

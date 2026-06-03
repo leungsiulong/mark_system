@@ -1,6 +1,5 @@
 // ================================================================
-// Main Application (v16 — robust drag-out protection for detail panel,
-//                         uncapped ranking integration)
+// Main Application (v17 — removed name templates; assignment categories support)
 // ================================================================
 const { createApp } = Vue;
 
@@ -12,9 +11,6 @@ createApp({
       settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{} },
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
       leftPanelOpen: true, expandedYears: {},
-
-      nameTemplates: ['工作紙', '默寫', '單元測試', '聆聽測驗', '說話練習', '閱讀理解', '寫作'],
-      newNameTemplate: '',
 
       calendarDate: new Date(),
       calendarWeekDate: new Date(),
@@ -455,68 +451,6 @@ createApp({
     moveQuickNavDown(idx) { if(idx>=this.activeQuickNavKeys.length-1)return;const a=[...this.activeQuickNavKeys];[a[idx],a[idx+1]]=[a[idx+1],a[idx]];this.activeQuickNavKeys=a;this.saveQuickNavSettings(); },
     async saveQuickNavSettings() { try{await db.collection('settings').doc('main').set({activeQuickNavKeys:this.activeQuickNavKeys},{merge:true});}catch(e){console.error(e);} },
 
-    insertNameTemplate(tpl) {
-      this.modalData.name = (this.modalData.name || '') + tpl;
-      this.$nextTick(() => {
-        const inputs = document.querySelectorAll('input[name="assessmentName"]');
-        if (inputs.length > 0) {
-          const input = inputs[inputs.length - 1];
-          try {
-            input.focus();
-            const len = input.value.length;
-            input.setSelectionRange(len, len);
-          } catch (e) {}
-        }
-      });
-    },
-
-    async addNameTemplate() {
-      const tpl = (this.newNameTemplate || '').trim();
-      if (!tpl) { this.addToast('請輸入模板內容', 'warning'); return; }
-      if (this.nameTemplates.includes(tpl)) {
-        this.addToast('已有相同模板', 'warning');
-        return;
-      }
-      this.nameTemplates.push(tpl);
-      this.newNameTemplate = '';
-      await this.saveNameTemplates();
-      this.addToast('已新增模板「' + tpl + '」', 'success');
-    },
-
-    async removeNameTemplate(idx) {
-      const removed = this.nameTemplates[idx];
-      this.nameTemplates.splice(idx, 1);
-      await this.saveNameTemplates();
-      this.addToast('已刪除「' + removed + '」', 'success');
-    },
-
-    moveNameTemplateUp(idx) {
-      if (idx <= 0) return;
-      const a = [...this.nameTemplates];
-      [a[idx-1], a[idx]] = [a[idx], a[idx-1]];
-      this.nameTemplates = a;
-      this.saveNameTemplates();
-    },
-
-    moveNameTemplateDown(idx) {
-      if (idx >= this.nameTemplates.length - 1) return;
-      const a = [...this.nameTemplates];
-      [a[idx], a[idx+1]] = [a[idx+1], a[idx]];
-      this.nameTemplates = a;
-      this.saveNameTemplates();
-    },
-
-    async saveNameTemplates() {
-      try {
-        await db.collection('settings').doc('main').set({
-          nameTemplates: this.nameTemplates
-        }, { merge: true });
-      } catch (e) {
-        console.error('Save name templates failed:', e);
-        this.addToast('儲存模板失敗', 'error');
-      }
-    },
-
     addToast(message,type='success') { const id=++this.toastCounter;this.toasts.push({id,message,type});setTimeout(()=>this.removeToast(id),3000); },
     removeToast(id) { this.toasts=this.toasts.filter(t=>t.id!==id); },
 
@@ -635,20 +569,13 @@ createApp({
       }
     });
 
-    // ★ v16: Robust drag-out protection — track BOTH mousedown and mouseup positions.
-    // Detail panel will close ONLY if BOTH press AND release happened outside the panel.
-    // Cases handled:
-    //   • Press inside,  release inside  → both inside  → don't close (normal panel interaction)
-    //   • Press inside,  release outside → press inside → don't close (drag-out scenario) ★
-    //   • Press outside, release inside  → up inside    → don't close (drag-in scenario)
-    //   • Press outside, release outside → both outside → CLOSE (normal outside click) ✓
     this._panelMousedownInside = false;
     this._panelMouseupInside = false;
 
     const _checkInsidePanel = (target) => {
       try {
         let t = target;
-        if (t && t.nodeType === 3) t = t.parentNode; // normalize text node → parent element
+        if (t && t.nodeType === 3) t = t.parentNode;
         if (t && typeof t.closest === 'function') {
           return !!t.closest('.detail-panel');
         }
@@ -656,12 +583,10 @@ createApp({
       return false;
     };
 
-    // mousedown — capture phase so it fires before any @mousedown.stop in bubble phase
     document.addEventListener('mousedown', (e) => {
       this._panelMousedownInside = _checkInsidePanel(e && e.target);
     }, true);
 
-    // mouseup — capture phase as well, also resets gradesIsDragging state
     document.addEventListener('mouseup', (e) => {
       this._panelMouseupInside = _checkInsidePanel(e && e.target);
       if (this.gradesIsDragging) {
@@ -676,13 +601,11 @@ createApp({
       this.gradesHeaderMenu = null;
       this.scoringCopyMenuOpen = false;
       this.scoringTooltip = null;
-      // ★ v16: Only close detail panel if BOTH mousedown AND mouseup were OUTSIDE
       if (this.gradesDetailPanel) {
         if (!this._panelMousedownInside && !this._panelMouseupInside) {
           this.gradesDetailPanel = null;
         }
       }
-      // Reset both flags for the next interaction
       this._panelMousedownInside = false;
       this._panelMouseupInside = false;
     });

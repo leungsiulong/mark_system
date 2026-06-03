@@ -1,5 +1,5 @@
 // ================================================================
-// Calendar Module (v7 — supports fullMarkS2 in calendar-added exam events)
+// Calendar Module (v8 — assignment categories, assignment default fullMark = 10)
 // ================================================================
 const CalendarMethods = {
   // ---------- Month navigation ----------
@@ -52,7 +52,6 @@ const CalendarMethods = {
         }
       }
     }
-    const fm = (this.settings && this.settings.defaultFullMark) ? this.settings.defaultFullMark : 100;
     this.openModal('calAddAssessment', {
       date: dateStr,
       yearId: preYearId,
@@ -60,8 +59,9 @@ const CalendarMethods = {
       termId: preTermId,
       type: 'assignment',
       name: '',
-      fullMark: fm,
+      fullMark: 10, // ★ default type assignment → 10
       notes: '',
+      assignmentCategoryId: '', _newAsgCatName: '',
       hasSubItems: false, subItems: [],
       hasAdjustedPaper: false, adjustedMultiplier: 80, passingScore: 50,
       fullMarkS2: '',
@@ -77,9 +77,10 @@ const CalendarMethods = {
     return cls.terms[Math.min(1, cls.terms.length - 1)].id;
   },
 
-  onCalModalYearChange() { this.modalData.classId = null; this.modalData.termId = null; this.modalData.name = ''; },
+  onCalModalYearChange() { this.modalData.classId = null; this.modalData.termId = null; this.modalData.name = ''; this.modalData.assignmentCategoryId = ''; this.modalData._newAsgCatName = ''; },
   onCalModalClassChange() {
     this.modalData.termId = null; this.modalData.name = '';
+    this.modalData.assignmentCategoryId = ''; this.modalData._newAsgCatName = '';
     if (this.modalData.classId) {
       const yr = this.academicYears.find(y => y.id === this.modalData.yearId);
       const cls = yr && yr.classes.find(c => c.id === this.modalData.classId);
@@ -107,6 +108,12 @@ const CalendarMethods = {
       return;
     }
     this.modalData.type = newType;
+    // ★ assignment default fullMark = 10, others = 100
+    this.modalData.fullMark = (newType === 'assignment') ? 10 : 100;
+    if (newType !== 'assignment') {
+      this.modalData.assignmentCategoryId = '';
+      this.modalData._newAsgCatName = '';
+    }
     if (newType !== 'exam') {
       this.modalData.hasAdjustedPaper = false;
       this.modalData.hasMultiplePapers = false;
@@ -204,6 +211,8 @@ const CalendarMethods = {
       fullMark: ev.fullMark,
       date: ev.date || '',
       notes: ev.notes || '',
+      assignmentCategoryId: ev.assignmentCategoryId || '',
+      _newAsgCatName: '',
       hasSubItems: ev.hasSubItems || false,
       subItems: ev.hasSubItems ? JSON.parse(JSON.stringify(ev.subItems || [])) : [],
       hasAdjustedPaper: ev.hasAdjustedPaper || false,
@@ -300,6 +309,16 @@ const CalendarMethods = {
       }
     }
 
+    // ★ v13: resolve assignment category
+    let asgCatId = null;
+    if (type === 'assignment') {
+      asgCatId = this.modalData.assignmentCategoryId || null;
+      if (asgCatId === '__new__') {
+        const nm = (this.modalData._newAsgCatName || '').trim();
+        asgCatId = nm ? await this._ensureAssignmentCategory(yearId, classId, nm) : null;
+      }
+    }
+
     const order = Date.now();
     const data = {
       type, name: aName, fullMark: fm, date: date || null, notes: (notes || '').trim(),
@@ -309,6 +328,7 @@ const CalendarMethods = {
     };
     if (type === 'assignment' || type === 'quiz') data.scoreCategory = 'none';
     if (type === 'quiz') data.allowBonus = false;
+    if (type === 'assignment' && asgCatId) data.assignmentCategoryId = asgCatId;
     if (hasSubItems && finalSubItems.length > 0) {
       data.hasSubItems = true;
       data.subItems = finalSubItems;

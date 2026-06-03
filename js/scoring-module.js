@@ -1,5 +1,5 @@
 // ================================================================
-// Scoring Module (v7 — restructured: attribution section separated, removed manual save/CSV)
+// Scoring Module (v8 — robust CSV export with proper escaping)
 // ================================================================
 const ScoringMethods = {
   scoringSetSubTab(tab) { this.scoringSubTab = tab; },
@@ -252,27 +252,74 @@ const ScoringMethods = {
     else { this.scoringReportSortKey = key; this.scoringReportSortAsc = key === 'studentNumber'; }
   },
 
-  // ★ v7: exportCSV is now called from the grades tab toolbar button
+  // ★ v8: Robust CSV export (proper escaping, CRLF, BOM, elective class column)
+  // Called from the grades tab toolbar button.
   exportCSV() {
     if (!this.gradesTerm || !this.gradesSortedStudents.length) { this.addToast('無數據可匯出','warning'); return; }
-    const ord = this.gradesOrderedAssessments, stu = this.gradesSortedStudents;
-    let csv = '\uFEFF學號,姓名';
-    for (const a of ord) csv += ',' + a.name + '(' + a.fullMark + ')';
-    csv += '\n';
-    for (const s of stu) {
-      csv += s.studentNumber + ',' + s.studentName;
-      for (const a of ord) {
-        const eff = this._getEffScore(a, s.id);
-        csv += ',' + (eff != null ? eff : '');
+    const ord = this.gradesOrderedAssessments;
+    const stu = this.gradesSortedStudents;
+    const isElective = this.isCurrentClassElective;
+
+    // RFC-4180 style escaping: wrap in double quotes if the field contains
+    // a comma, double-quote, or line break; double-up any internal quotes.
+    const esc = (val) => {
+      if (val === null || val === undefined) return '';
+      let s = String(val);
+      if (/[",\n\r]/.test(s)) {
+        s = '"' + s.replace(/"/g, '""') + '"';
       }
-      csv += '\n';
+      return s;
+    };
+
+    const fmtScore = (eff) => {
+      if (eff === null || eff === undefined || isNaN(eff)) return '';
+      if (Number.isInteger(eff)) return String(eff);
+      // avoid floating point noise like 87.32999999
+      return String(Math.round(eff * 100) / 100);
+    };
+
+    const lines = [];
+
+    // ---- header row ----
+    const header = [];
+    if (isElective) header.push('班別');
+    header.push('學號', '姓名');
+    for (const a of ord) header.push(a.name + '(' + a.fullMark + ')');
+    lines.push(header.map(esc).join(','));
+
+    // ---- data rows ----
+    for (const s of stu) {
+      const row = [];
+      if (isElective) row.push(this.getStudentOriginClass(s) || '');
+      row.push(s.studentNumber, s.studentName);
+      for (const a of ord) {
+        row.push(fmtScore(this._getEffScore(a, s.id)));
+      }
+      lines.push(row.map(esc).join(','));
     }
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+
+    // BOM + CRLF for proper Excel (Chinese) rendering
+    const csv = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url;
+    const link = document.createElement('a');
+    link.href = url;
+
     const cls = this.currentClass;
-    link.download = (cls ? cls.className+'_'+cls.subject : '成績') + '_' + (this.gradesTerm ? this.gradesTerm.name : '') + '.csv';
-    link.click(); URL.revokeObjectURL(url); this.addToast('CSV 已匯出','success');
+    const nameParts = [];
+    if (cls) {
+      if (cls.className) nameParts.push(cls.className);
+      if (cls.subject) nameParts.push(cls.subject);
+    }
+    if (!nameParts.length) nameParts.push('成績');
+    if (this.gradesTerm && this.gradesTerm.name) nameParts.push(this.gradesTerm.name);
+    link.download = nameParts.join('_') + '.csv';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    this.addToast('CSV 已匯出', 'success');
   }
 };
 
