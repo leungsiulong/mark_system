@@ -1,5 +1,5 @@
 // ================================================================
-// Settings Module (v1 — 基本設定 / 學期日期 / 計分模板)
+// Settings Module (v2 — 計分模板新增「科目 / 級別」欄位；批次1)
 //   第六輪 批次1：系統設定完善
 // ================================================================
 const SettingsMethods = {
@@ -95,9 +95,17 @@ const SettingsMethods = {
     this.settingsNav = [{ key: 'templates', label: '計分模板' }];
   },
 
+  // ★ 新增：可選擇的級別（小一-小六、中一-中六）
+  getTemplateLevelOptions() {
+    return ['小一', '小二', '小三', '小四', '小五', '小六', '中一', '中二', '中三', '中四', '中五', '中六'];
+  },
+
   _blankTemplateData() {
     return {
       name: '',
+      subject: '',         // ★ 新增：適用科目（可選）
+      level: '',           // ★ 新增：適用級別（可選）
+      _useNewSubject: false,
       ut: { assignment: 20, quiz: 20, unifiedTest: 40, classPerformance: 20 },
       exam: { a1Ratio: 30, a2Ratio: 70, a1Weights: { assignment: 6, quiz: 6, unifiedTest: 12, classPerformance: 6 } },
       yearly: { t1Weight: 40, t2Weight: 60 }
@@ -110,6 +118,9 @@ const SettingsMethods = {
     this.openModal('editTemplate', {
       id: tpl.id,
       name: tpl.name,
+      subject: tpl.subject || '',   // ★ 載入既有值
+      level: tpl.level || '',       // ★ 載入既有值
+      _useNewSubject: false,
       ut: {
         assignment: tpl.ut.assignment, quiz: tpl.ut.quiz,
         unifiedTest: tpl.ut.unifiedTest, classPerformance: tpl.ut.classPerformance
@@ -130,6 +141,8 @@ const SettingsMethods = {
     const num = (v) => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
     return {
       name: (m.name || '').trim(),
+      subject: (m.subject || '').toString().trim(),  // ★ 寫入科目
+      level: (m.level || '').toString().trim(),      // ★ 寫入級別
       ut: {
         assignment: num(m.ut.assignment), quiz: num(m.ut.quiz),
         unifiedTest: num(m.ut.unifiedTest), classPerformance: num(m.ut.classPerformance)
@@ -243,6 +256,11 @@ const SettingsMethods = {
 
 const SettingsComputed = {
   scoringTemplates() { return (this.settings && this.settings.templates) || []; },
+
+  // ★ 新增：模板級別下拉選項（給 v-for 使用）
+  templateLevelOptions() {
+    return ['小一', '小二', '小三', '小四', '小五', '小六', '中一', '中二', '中三', '中四', '中五', '中六'];
+  },
 
   templateModalUTTotal() {
     const u = this.modalData && this.modalData.ut;
