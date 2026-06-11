@@ -197,6 +197,9 @@
     .loading-progress{width:240px;height:4px;background:#e5e7eb;border-radius:9999px;overflow:hidden;margin-top:12px}
     .loading-progress-fill{height:100%;background:linear-gradient(to right,var(--theme-primary),var(--theme-secondary));transition:width .3s cubic-bezier(0.4,0,0.2,1)}
 
+    /* ★ v21: 學年懶載入覆蓋層 */
+    .year-loading-overlay{background:rgba(248,250,252,0.72);backdrop-filter:blur(3px)}
+
     /* =========================================================
        Theme-aware Glassmorphism Override
        ========================================================= */
@@ -299,6 +302,19 @@
       </div>
     </div>
   </div>
+
+  <!-- ★ v21: 學年懶載入覆蓋層（切換 / 按需載入學年時顯示，補齊批次0 規格第4點 UI 載入狀態） -->
+  <transition name="fade">
+    <div v-if="yearLoading" class="year-loading-overlay fixed inset-0 flex items-center justify-center" style="z-index:45">
+      <div class="glass-card rounded-2xl px-6 py-5 flex items-center gap-4 shadow-xl">
+        <i class="fas fa-circle-notch fa-spin text-2xl" style="color:var(--theme-primary)"></i>
+        <div>
+          <div class="text-sm font-bold text-gray-700">{{yearLoadingText || '正在載入學年資料...'}}</div>
+          <div class="text-xs text-gray-400 mt-0.5">首次開啟此學年需載入詳細成績資料</div>
+        </div>
+      </div>
+    </div>
+  </transition>
 
   <div class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="min-width:260px">
     <transition-group name="toast">
@@ -485,7 +501,7 @@
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
               <p class="text-blue-700">
                 <i class="fas fa-info-circle mr-1"></i>
-                新增的「一般班別」只含學生名單，無科目。如需新增科目，完成後請至「科目管理」操作。
+                新增的「一般班別」只含學生名單,無科目。如需新增科目，完成後請至「科目管理」操作。
               </p>
             </div>
             <div v-if="modalExistingRegular" class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
@@ -832,7 +848,7 @@
             </div>
           </template>
 
-          <template v-if="modalData.type !== 'unified_test' && !(modalData.type === 'exam' && (modalData.hasAdjustedPaper || modalData.hasMultiplePapers))">
+<template v-if="modalData.type !== 'unified_test' && !(modalData.type === 'exam' && (modalData.hasAdjustedPaper || modalData.hasMultiplePapers))">
             <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="modalData.hasSubItems" class="mt-0.5 rounded border-gray-300">
@@ -927,13 +943,72 @@
           <div class="text-xs text-gray-500">新增後，您可以在「總分計算」的計分權重中為此類別設定權重（自動儲存）。</div>
         </template>
 
+        <!-- ★ 第六輪：計分模板 新增 / 編輯 -->
+        <template v-if="modalType==='addTemplate'||modalType==='editTemplate'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">模板名稱</label>
+            <input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：標準計分（30/70）">
+          </div>
+
+          <div class="border rounded-lg p-3">
+            <h4 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider"><i class="fas fa-balance-scale text-blue-500 mr-1"></i>A. 統測 (A3) 權重</h4>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="modalData.ut.assignment" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="modalData.ut.quiz" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">統測</label><div class="flex"><input v-model.number="modalData.ut.unifiedTest" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="modalData.ut.classPerformance" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+            </div>
+            <div class="mt-2 text-xs font-medium" :class="templateModalUTTotal===100?'text-green-600':'text-red-500'">合計：{{templateModalUTTotal}}%<span v-if="templateModalUTTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
+          </div>
+
+          <div class="border rounded-lg p-3">
+            <h4 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider"><i class="fas fa-file-alt text-red-500 mr-1"></i>B. 考試（A1 / A2）</h4>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="text-xs text-gray-500 mb-1 block">A1 常分</label><div class="flex"><input v-model.number="modalData.exam.a1Ratio" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">A2 考試分</label><div class="flex"><input v-model.number="modalData.exam.a2Ratio" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+            </div>
+            <div class="mt-2 text-xs font-medium" :class="templateModalA1A2Total===100?'text-green-600':'text-red-500'">合計：{{templateModalA1A2Total}}%<span v-if="templateModalA1A2Total!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
+
+            <h5 class="text-xs font-semibold text-gray-500 mt-3 mb-2">A1 內部權重</h5>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div><label class="text-xs text-gray-500 mb-1 block">課業</label><div class="flex"><input v-model.number="modalData.exam.a1Weights.assignment" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">小測</label><div class="flex"><input v-model.number="modalData.exam.a1Weights.quiz" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">統測(A3)</label><div class="flex"><input v-model.number="modalData.exam.a1Weights.unifiedTest" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">課堂表現</label><div class="flex"><input v-model.number="modalData.exam.a1Weights.classPerformance" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+            </div>
+            <div class="mt-2 text-xs font-medium" :class="templateModalA1InternalTotal===(modalData.exam.a1Ratio||0)?'text-green-600':'text-red-500'">合計：{{templateModalA1InternalTotal}}%<span v-if="templateModalA1InternalTotal!==(modalData.exam.a1Ratio||0)">（應等於 A1 權重 {{modalData.exam.a1Ratio||0}}%）</span><i v-else class="fas fa-check ml-1"></i></div>
+          </div>
+
+          <div class="border rounded-lg p-3">
+            <h4 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider"><i class="fas fa-calendar-alt text-purple-500 mr-1"></i>C. 全年總分</h4>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="text-xs text-gray-500 mb-1 block">上學期</label><div class="flex"><input v-model.number="modalData.yearly.t1Weight" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+              <div><label class="text-xs text-gray-500 mb-1 block">下學期</label><div class="flex"><input v-model.number="modalData.yearly.t2Weight" type="number" inputmode="numeric" min="0" max="100" class="w-full border border-gray-300 rounded-l-lg px-2 py-1.5 text-sm text-center outline-none"><span class="bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg px-2 py-1.5 text-sm text-gray-500">%</span></div></div>
+            </div>
+            <div class="mt-2 text-xs font-medium" :class="templateModalYearlyTotal===100?'text-green-600':'text-red-500'">合計：{{templateModalYearlyTotal}}%<span v-if="templateModalYearlyTotal!==100">（應等於 100%）</span><i v-else class="fas fa-check ml-1"></i></div>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-700">
+            <i class="fas fa-info-circle mr-1"></i>模板不含「自訂類別」權重。套用至班別時，原有自訂類別權重會保留，請套用後檢查各區合計。
+          </div>
+        </template>
+
+        <!-- ★ 第六輪：套用計分模板 確認 -->
+        <template v-if="modalType==='applyTemplateConfirm'">
+          <div class="text-center py-3">
+            <i class="fas fa-clone text-4xl text-blue-400 mb-3"></i>
+            <p class="text-gray-800 font-medium">確定要套用模板「{{modalData.templateName}}」嗎？</p>
+            <p class="text-gray-500 text-sm mt-1">將覆蓋目前班別的統測 / 考試 / 全年權重設定（自訂類別權重會保留），並自動儲存。</p>
+          </div>
+        </template>
+
         <template v-if="modalType==='deleteConfirm'">
           <div class="text-center py-4"><i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3"></i><p class="text-gray-800 font-medium">{{modalData.message}}</p><p v-if="modalData.submessage" class="text-gray-500 text-sm mt-1">{{modalData.submessage}}</p></div>
         </template>
       </div>
       <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t bg-gray-50">
         <button @click="closeModal" type="button" class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-        <button @click="confirmModal" type="button" class="px-4 py-2 text-sm text-white rounded-lg" :class="modalType==='deleteConfirm'?'bg-red-500 hover:bg-red-600':'bg-blue-500 hover:bg-blue-600'">{{modalType==='deleteConfirm'?'確認刪除':'確認'}}</button>
+        <button @click="confirmModal" type="button" class="px-4 py-2 text-sm text-white rounded-lg" :class="modalType==='deleteConfirm'?'bg-red-500 hover:bg-red-600':'bg-blue-500 hover:bg-blue-600'">{{modalType==='deleteConfirm'?'確認刪除':(modalType==='applyTemplateConfirm'?'確認套用':'確認')}}</button>
       </div>
     </div>
   </div>
@@ -942,7 +1017,7 @@
   <div v-if="!loading" class="h-screen flex flex-col">
     <header :style="headerStyle" class="app-header text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
       <button v-if="currentView!=='home' && currentView!=='settings'" @click="leftPanelOpen=!leftPanelOpen" class="p-1.5 rounded-lg hover:bg-white/20 transition"><i class="fas fa-bars"></i></button>
-      <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">成績管理系統</h1>
+      <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">{{settings.schoolName ? settings.schoolName : '成績管理系統'}}</h1>
       <div class="flex-1"></div>
       <div v-if="currentAcademicYear" class="text-xs sm:text-sm opacity-90 hidden sm:block truncate max-w-xs"><span>{{currentAcademicYear.name}}</span><span v-if="currentClass"> / {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></span></div>
     </header>
@@ -969,7 +1044,7 @@
                   <i class="fas fa-chalkboard text-xs" :style="{color:currentClassId===c.id?'var(--theme-primary)':'#9ca3af'}"></i>
                   <span class="truncate">{{c.className}}</span><span class="text-xs opacity-60" v-if="c.subject">- {{c.subject}}</span>
                   <span v-if="c.classType === 'elective'" class="ml-0.5 text-xs text-purple-500" title="選修科">★</span>
-                  <span class="ml-auto text-xs opacity-50">{{c.students.length}}</span>
+                  <span class="ml-auto text-xs opacity-50">{{treeClassStudentCount(y, c)}}</span>
                 </div>
               </div>
             </div>
@@ -984,7 +1059,7 @@
         <div v-if="currentView==='home'" class="p-3 sm:p-4 lg:p-6">
           <div :style="bannerStyle" class="rounded-xl p-4 sm:p-6 text-white mb-4 sm:mb-6 shadow">
             <h2 class="text-xl sm:text-2xl font-bold mb-1">歡迎使用成績管理系統</h2>
-            <p class="opacity-90 text-sm sm:text-base">{{currentDateDisplay}}</p>
+            <p class="opacity-90 text-sm sm:text-base">{{currentDateDisplay}}<span v-if="settings.teacherName" class="ml-2">· {{settings.teacherName}} 老師</span></p>
           </div>
 
           <div class="mb-4 sm:mb-6">
@@ -1425,6 +1500,36 @@
             <div v-if="scoringSubTab==='settings'" class="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
               <div class="max-w-3xl mx-auto space-y-4">
 
+                <!-- ★ 第六輪：套用計分模板 -->
+                <div class="bg-white rounded-xl shadow px-3 sm:px-5 py-3 flex flex-wrap items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><i class="fas fa-clone text-indigo-500 text-sm"></i></div>
+                    <div>
+                      <h3 class="font-bold text-gray-800 text-sm">套用計分模板</h3>
+                      <p class="text-xs text-gray-500 hidden sm:block">快速套用預設權重組合（自訂類別權重會保留）</p>
+                    </div>
+                  </div>
+                  <div class="flex-1"></div>
+                  <div class="relative">
+                    <button @click.stop="scoringApplyMenuOpen=!scoringApplyMenuOpen" class="px-3 py-1.5 text-xs sm:text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition flex items-center gap-1">
+                      <i class="fas fa-clone"></i><span>套用模板</span><i class="fas fa-caret-down ml-0.5"></i>
+                    </button>
+                    <div v-if="scoringApplyMenuOpen" class="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg z-30 py-1 w-56" @click.stop>
+                      <div class="px-3 py-1.5 text-xs font-semibold text-gray-400 border-b">選擇要套用的模板</div>
+                      <div v-if="scoringTemplates.length===0" class="px-3 py-3 text-xs text-gray-400 italic text-center">
+                        尚無模板<br><span>請至「設定 → 計分模板」新增</span>
+                      </div>
+                      <button v-for="tpl in scoringTemplates" :key="tpl.id" @click="requestApplyTemplate(tpl)" class="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 flex items-center justify-between gap-2 text-gray-700">
+                        <span class="truncate font-medium">{{tpl.name}}</span>
+                        <span class="text-gray-400 shrink-0">{{tpl.ut.assignment}}/{{tpl.ut.quiz}}/{{tpl.ut.unifiedTest}}/{{tpl.ut.classPerformance}}</span>
+                      </button>
+                      <div class="border-t mt-1 pt-1">
+                        <button @click="goToTemplatesSettings();scoringApplyMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50"><i class="fas fa-cog mr-1"></i>管理模板...</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="bg-white rounded-xl shadow overflow-hidden">
                   <button @click="scoringToggleAccordion('attribution')" class="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-2 sm:gap-3">
@@ -1438,11 +1543,14 @@
                   </button>
                   <div v-if="scoringAccordion.attribution" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
                     <div class="mt-3 space-y-2">
-                      <div v-for="a in scoringAssignmentsAndQuizzes" :key="'attr-'+a.id" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition" :class="{'opacity-40':(a.scoreCategory||'none')==='exam'}">
+                      <!-- ★ 統測項目用淺靛藍底 + 靛藍外框；考試項目改用淺琥珀底 + 琥珀外框（不再使用紅色） -->
+                      <div v-for="a in scoringAssignmentsAndQuizzes" :key="'attr-'+a.id" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition" :class="(a.scoreCategory||'none')==='exam' ? 'bg-amber-50 ring-1 ring-amber-200' : ((a.scoreCategory||'none')==='ut' ? 'bg-indigo-50 ring-1 ring-indigo-200' : '')">
                         <div class="flex-1 min-w-0">
                           <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
                             <span class="text-xs px-1 sm:px-1.5 py-0.5 rounded font-medium" :class="a.type==='assignment'?'bg-blue-100 text-blue-700':(a.type==='quiz'?'bg-green-100 text-green-700':'bg-teal-100 text-teal-700')">{{a.type==='assignment'?'課業':a.type==='quiz'?'小測':'自訂'}}</span>
                             <span class="text-xs sm:text-sm font-medium text-gray-800 truncate">{{a.name}}</span>
+                            <span v-if="(a.scoreCategory||'none')==='ut'" class="text-xs px-1 sm:px-1.5 py-0.5 rounded font-medium bg-indigo-100 text-indigo-700"><i class="fas fa-balance-scale mr-0.5"></i>計入統測</span>
+                            <span v-if="(a.scoreCategory||'none')==='exam'" class="text-xs px-1 sm:px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700"><i class="fas fa-file-alt mr-0.5"></i>計入考試</span>
                             <span class="text-xs text-gray-400 hidden sm:inline">{{gradesFormatDate(a.date)}}</span>
                           </div>
                         </div>
@@ -2200,12 +2308,96 @@
               <span @click="settingsNav=[]" class="cursor-pointer text-gray-500 hover:text-gray-700 font-medium whitespace-nowrap"><i class="fas fa-home text-xs mr-1"></i>設定</span>
               <template v-for="(item,idx) in settingsNav" :key="idx"><i class="fas fa-chevron-right text-xs text-gray-300"></i><span @click="settingsGoTo(idx)" class="cursor-pointer text-gray-500 hover:text-gray-700 whitespace-nowrap" :class="idx===settingsNav.length-1?'text-gray-800 font-semibold':''">{{item.label}}</span></template>
             </div>
+            <span v-if="settingsSaveStatus==='saved'" class="text-xs text-green-500"><i class="fas fa-check mr-1"></i>已自動儲存</span>
           </div>
 
           <div v-if="settingsCurrentView==='root'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div @click="settingsEnter({key:'years',label:'學年管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><i class="fas fa-sitemap text-blue-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-blue-600">學年班別管理</h3></div><p class="text-sm text-gray-500">管理學年、班別、科目及學生</p></div>
             <div @click="settingsEnter({key:'layout',label:'外觀設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center shrink-0"><i class="fas fa-palette text-pink-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-pink-600">外觀設定</h3></div><p class="text-sm text-gray-500">自訂介面主題顏色與標籤排序</p></div>
             <div @click="settingsEnter({key:'quicknav',label:'快速導航設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-th-large text-green-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-green-600">快速導航設定</h3></div><p class="text-sm text-gray-500">自訂首頁快速導航項目</p></div>
+            <div @click="settingsEnter({key:'basic',label:'基本設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0"><i class="fas fa-school text-cyan-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-cyan-600">基本設定</h3></div><p class="text-sm text-gray-500">學校名稱、老師姓名、預設滿分</p></div>
+            <div @click="settingsEnter({key:'termDates',label:'學期日期設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center shrink-0"><i class="fas fa-calendar-week text-orange-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-orange-600">學期日期設定</h3></div><p class="text-sm text-gray-500">設定上下學期起訖，自動判斷項目學期</p></div>
+            <div @click="settingsEnter({key:'templates',label:'計分模板'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><i class="fas fa-clone text-indigo-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-indigo-600">計分模板</h3></div><p class="text-sm text-gray-500">建立可重用的計分權重組合</p></div>
+
+          </div>
+
+          <!-- ★ 第六輪：基本設定 -->
+          <div v-if="settingsCurrentView==='basic'">
+            <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-4">基本設定</h2>
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6 max-w-xl space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fas fa-school text-cyan-500 mr-1"></i>學校名稱</label>
+                <input v-model="settings.schoolName" @input="onBasicSettingsChange" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：示範中學">
+                <p class="text-xs text-gray-400 mt-1">會顯示於頁面頂部標題。</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fas fa-user text-cyan-500 mr-1"></i>老師姓名</label>
+                <input v-model="settings.teacherName" @input="onBasicSettingsChange" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：陳老師">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fas fa-star text-cyan-500 mr-1"></i>預設滿分</label>
+                <input v-model.number="settings.defaultFullMark" @input="onBasicSettingsChange" type="number" inputmode="numeric" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="100">
+                <p class="text-xs text-gray-400 mt-1">新增「小測 / 統測 / 考試 / 課堂表現 / 自訂」項目時的預設滿分（課業固定預設為 10）。</p>
+              </div>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+                <i class="fas fa-cloud-upload-alt mr-1"></i>變更後會自動儲存。
+              </div>
+            </div>
+          </div>
+
+          <!-- ★ 第六輪：學期日期設定 -->
+          <div v-if="settingsCurrentView==='termDates'">
+            <h2 class="text-base sm:text-lg font-bold text-gray-800 mb-4">學期日期設定</h2>
+            <div class="bg-white rounded-xl shadow p-4 sm:p-6 max-w-2xl space-y-5">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-hourglass-start text-blue-500 mr-1"></i>上學期</h3>
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label class="block text-xs text-gray-500 mb-1">開始日期</label><input v-model="settings.termDates.t1Start" @change="onTermDatesChange" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none"></div>
+                  <div><label class="block text-xs text-gray-500 mb-1">結束日期</label><input v-model="settings.termDates.t1End" @change="onTermDatesChange" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none"></div>
+                </div>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-hourglass-end text-green-500 mr-1"></i>下學期</h3>
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label class="block text-xs text-gray-500 mb-1">開始日期</label><input v-model="settings.termDates.t2Start" @change="onTermDatesChange" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none"></div>
+                  <div><label class="block text-xs text-gray-500 mb-1">結束日期</label><input v-model="settings.termDates.t2End" @change="onTermDatesChange" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none"></div>
+                </div>
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                <i class="fas fa-info-circle mr-1"></i>
+                新增評估項目（含月曆新增）時，會依此日期範圍自動判斷項目所屬學期。未設定則退回月份規則（9月～1月為上學期）。變更後自動儲存。
+              </div>
+            </div>
+          </div>
+
+          <!-- ★ 第六輪：計分模板 -->
+          <div v-if="settingsCurrentView==='templates'">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-base sm:text-lg font-bold text-gray-800">計分模板</h2>
+              <button @click="openAddTemplateModal" class="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"><i class="fas fa-plus mr-1"></i>新增模板</button>
+            </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-700">
+              <i class="fas fa-info-circle mr-1"></i>模板可在「總分計算 → 計分設定」頂部一鍵套用至任一班別。模板不含自訂類別權重。
+            </div>
+            <div class="space-y-2">
+              <div v-for="tpl in scoringTemplates" :key="tpl.id" class="bg-white rounded-xl shadow p-3 sm:p-4 group hover:shadow-md transition">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><i class="fas fa-clone text-indigo-500"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-bold text-gray-800 truncate">{{tpl.name}}</div>
+                    <div class="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>統測 課{{tpl.ut.assignment}}/測{{tpl.ut.quiz}}/統{{tpl.ut.unifiedTest}}/堂{{tpl.ut.classPerformance}}</span>
+                      <span>考試 A1 {{tpl.exam.a1Ratio}}% / A2 {{tpl.exam.a2Ratio}}%</span>
+                      <span>全年 {{tpl.yearly.t1Weight}}/{{tpl.yearly.t2Weight}}</span>
+                    </div>
+                  </div>
+                  <button @click="duplicateTemplate(tpl)" class="p-1.5 text-gray-400 hover:text-green-500 opacity-0 group-hover:opacity-100 shrink-0" title="複製"><i class="fas fa-copy"></i></button>
+                  <button @click="openEditTemplateModal(tpl)" class="p-1.5 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 shrink-0" title="編輯"><i class="fas fa-edit"></i></button>
+                  <button @click="confirmDeleteTemplate(tpl)" class="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 shrink-0" title="刪除"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+            </div>
+            <div v-if="scoringTemplates.length===0" class="text-center text-gray-400 py-12">尚無計分模板，請點擊上方按鈕新增</div>
           </div>
 
           <div v-if="settingsCurrentView==='years'">
@@ -2420,6 +2612,7 @@
 <script src="js/crud-module.js"></script>
 <script src="js/analysis-module.js"></script>
 <script src="js/export-module.js"></script>
+<script src="js/settings-module.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

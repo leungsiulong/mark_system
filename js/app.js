@@ -1,5 +1,5 @@
 // ================================================================
-// Main Application (v19 — global theme token system)
+// Main Application (v21 — settings module: basic / termDates / templates)
 // ================================================================
 const { createApp } = Vue;
 
@@ -7,8 +7,9 @@ createApp({
   data() {
     return {
       loading: true, loadingText: '正在載入數據...', loadingProgress: 0,
+      yearLoading: false, yearLoadingText: '', // ★ v20: 學年懶載入覆蓋層狀態
       error: null, academicYears: [], globalStudents: [],
-      settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{} },
+      settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{}, templates:[] },
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
       leftPanelOpen: true, expandedYears: {},
 
@@ -28,6 +29,7 @@ createApp({
       activeQuickNavKeys: ['grades','scoring','analysis','yearMgmt'],
       settingsNav: [],
       settingsYearTab: 'classes',
+      settingsSaveStatus: '', // ★ 第六輪：基本設定 / 學期日期自動儲存狀態
       showModal: false, modalType: null, modalData: {},
       toasts: [], toastCounter: 0,
       studentSortKey: 'studentNumber', studentSortAsc: true,
@@ -55,11 +57,13 @@ createApp({
       ],
 
       scoringSubTab: 'settings',
-      scoringAccordion: { attribution: true, ut: true, exam: false, yearly: false },
+      // ★ 計分設定所有選單預設摺疊
+      scoringAccordion: { attribution: false, ut: false, exam: false, yearly: false },
       scoringSaveStatus: '',
       scoringTooltip: null,
       scoringCopyMenuOpen: false,
       scoringExportMenuOpen: false, // ★ v18
+      scoringApplyMenuOpen: false, // ★ 第六輪：套用計分模板下拉
       scoringCopyColumns: { a3: true, a1: false, a2: false, examTotal: true },
       scoringReportSortKey: 'className',
       scoringReportSortAsc: true,
@@ -154,6 +158,29 @@ createApp({
       return r;
     },
 
+    // ★ v20: 由 globalStudents records 推導各學年/各班學生數
+    //   （供「未完整載入」的學年在側欄、設定頁仍顯示正確人數；computed 會隨 globalStudents 變動自動更新）
+    _yearStudentCountMap() {
+      const map = {};
+      for (const g of this.globalStudents) {
+        const seen = new Set();
+        for (const r of (g.records || [])) {
+          if (r.academicYearId && !seen.has(r.academicYearId)) { seen.add(r.academicYearId); map[r.academicYearId] = (map[r.academicYearId] || 0) + 1; }
+        }
+      }
+      return map;
+    },
+    _classStudentCountMap() {
+      const map = {};
+      for (const g of this.globalStudents) {
+        const seen = new Set();
+        for (const r of (g.records || [])) {
+          if (r.classId && !seen.has(r.classId)) { seen.add(r.classId); map[r.classId] = (map[r.classId] || 0) + 1; }
+        }
+      }
+      return map;
+    },
+
     scoringReportFinalData() {
       const data = (this.scoringReportSortedData || []).map(r => {
         let originClass = '';
@@ -185,7 +212,9 @@ createApp({
         deleteConfirm:'確認刪除',
         addAssessment:'新增評估項目', editAssessment:'編輯評估項目',
         calAddAssessment:'從月曆新增項目',
-        addCustomCategory:'新增自訂類別'
+        addCustomCategory:'新增自訂類別',
+        addTemplate:'新增計分模板', editTemplate:'編輯計分模板',
+        applyTemplateConfirm:'套用計分模板'
       };
       return map[this.modalType]||'';
     },
@@ -256,14 +285,27 @@ createApp({
       return result;
     },
 
-    ...GradesComputed, ...ScoringComputed, ...CalendarComputed, ...AnalysisComputed,
+    ...GradesComputed, ...ScoringComputed, ...CalendarComputed, ...AnalysisComputed, ...SettingsComputed,
   },
 
   watch: {
     // ★ v19: 主題改變時，無論透過什麼途徑，都重寫 CSS variables
     currentTheme() { this.$nextTick(() => this.applyThemeTokens()); },
+    // ★ v20: 切換學年 → 懶載入該學年 + 記住選取（防破壞既有 currentClassId 一致性檢查）
     currentAcademicYearId(nv, ov) {
-      if (nv !== ov) { if (this.currentClassId) { const year=this.academicYears.find(y=>y.id===nv); if (!year||!year.classes.find(c=>c.id===this.currentClassId)) this.currentClassId=null; } this.gradesResetFocus(); }
+      if (nv === ov) return;
+      if (this.currentClassId) {
+        const year = this.academicYears.find(y => y.id === nv);
+        if (!year || !year.classes.find(c => c.id === this.currentClassId)) this.currentClassId = null;
+      }
+      this.gradesResetFocus();
+      if (nv) {
+        const yr = this.academicYears.find(y => y.id === nv);
+        // 安全網：任何直接改 currentAcademicYearId 而未先載入者，於此非阻塞觸發載入
+        if (yr && !yr._loaded && !yr._loading) this.ensureYearLoaded(nv);
+        if (this._skipYearWatchSave) this._skipYearWatchSave = false;
+        else this._saveLastSelectedYear(nv);
+      }
     },
     currentClassId() {
       this.gradesResetFocus();
@@ -316,13 +358,21 @@ createApp({
       handler() { this.$nextTick(() => this.analysisRenderTrend()); },
       deep: true
     },
-    analysisCrossYearStudent() {
-      this.$nextTick(() => setTimeout(() => this.analysisRenderCrossYearTrend(), 80));
+    // ★ v20: 跨學年分析需相關學年完整資料 → 先按需載入再渲染（computed 載入後自動重算）
+    analysisCrossYearStudent(gs) {
+      if (gs) {
+        const yearIds = [...new Set((gs.records || []).map(r => r.academicYearId))];
+        this.ensureYearsLoaded(yearIds).then(() => {
+          this.$nextTick(() => setTimeout(() => this.analysisRenderCrossYearTrend(), 80));
+        });
+      } else {
+        this.$nextTick(() => setTimeout(() => this.analysisRenderCrossYearTrend(), 80));
+      }
     }
   },
 
   methods: {
-    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods,
+    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods, ...SettingsMethods,
 
     switchToTab(key) {
       if (key === 'settings') this.settingsNav = [];
@@ -338,20 +388,32 @@ createApp({
     assessmentLabel(type) { return {assignment:'課業',quiz:'小測',unified_test:'統測',exam:'考試',class_performance:'課堂表現',custom:'自訂'}[type]||type; },
 
     toggleYear(yearId) { this.expandedYears={...this.expandedYears,[yearId]:!this.expandedYears[yearId]}; },
-    selectFromTree(yearId,classId) {
-      this.currentAcademicYearId=yearId;
-      this.currentClassId=classId;
+    // ★ v20: 切換學年前先確保完整載入（await 完成後再設定 class，避免 watcher 在骨架狀態下初始化空值）
+    async selectFromTree(yearId, classId) {
       if (window.innerWidth < 1024) this.leftPanelOpen = false;
+      await this.ensureYearLoaded(yearId);
+      this.currentAcademicYearId = yearId;
+      this.currentClassId = classId;
     },
     sortStudents(key) { if(this.studentSortKey===key)this.studentSortAsc=!this.studentSortAsc;else{this.studentSortKey=key;this.studentSortAsc=true;} },
 
     yearStudentCount(y) {
-      const seen = new Set();
-      for (const c of y.classes) for (const s of (c.students || [])) seen.add(s.globalStudentId || s.id);
-      return seen.size;
+      if (y && y._loaded) {
+        const seen = new Set();
+        for (const c of y.classes) for (const s of (c.students || [])) seen.add(s.globalStudentId || s.id);
+        return seen.size;
+      }
+      // ★ v20: 骨架學年改由 globalStudents records 推導學生數
+      return this._yearStudentCountMap[y.id] || 0;
     },
     yearRegularCount(y) { return y.classes.filter(c => c.classType === 'regular').length; },
     yearSubjectCount(y) { return y.classes.filter(c => c.classType === 'subject' || c.classType === 'elective').length; },
+
+    // ★ v20: 側欄班別學生數（未載入學年由 globalStudents records 推導）
+    treeClassStudentCount(y, c) {
+      if (y && y._loaded) return (c.students || []).length;
+      return this._classStudentCountMap[c.id] || 0;
+    },
 
     classSubjectsCount(cls) {
       if (!this.settingsYear) return 0;
@@ -419,7 +481,7 @@ createApp({
       this.openModal('deleteConfirm', { target: 'class', id: c.id, yearId: this.settingsCurrentYearId, message: msg, submessage: sub });
     },
 
-    settingsEnter(item) { this.settingsNav=[...this.settingsNav,item]; },
+    settingsEnter(item) { this.settingsNav=[...this.settingsNav,item]; if (item.yearId) this.ensureYearLoaded(item.yearId); }, // ★ v20: 進入學年層確保完整載入
     settingsGoTo(idx) { this.settingsNav=this.settingsNav.slice(0,idx+1); },
     settingsBack() { if (this.settingsNav.length > 0) this.settingsNav = this.settingsNav.slice(0, -1); },
 
@@ -441,6 +503,12 @@ createApp({
       if (!this.modalData.selectedStudentIds) return;
       const ids = new Set(group.students.map(s => s.id));
       this.modalData.selectedStudentIds = this.modalData.selectedStudentIds.filter(id => !ids.has(id));
+    },
+
+    // ★ v20: 記住上次選取的學年，下次啟動優先完整載入
+    async _saveLastSelectedYear(yearId) {
+      try { await db.collection('settings').doc('main').set({ lastSelectedYearId: yearId }, { merge: true }); }
+      catch (e) { console.error('save lastSelectedYearId failed', e); }
     },
 
     // ★ v19: 依 currentTheme 把主題色寫入 CSS variables（全站即時變色核心）
@@ -534,6 +602,9 @@ createApp({
           case'editAssessment':await this.updateAssessmentConfirm();break;
           case'calAddAssessment':await this.calAddAssessmentConfirm();break;
           case'addCustomCategory':await this.addCustomCategoryConfirm();break;
+          case'addTemplate':await this.addTemplateConfirm();break;
+          case'editTemplate':await this.updateTemplateConfirm();break;
+          case'applyTemplateConfirm':await this.applyTemplateConfirm();break;
           case'deleteConfirm':await this.handleDelete();break;
         }
       } catch(err){this.addToast('操作失敗：'+err.message,'error');}
@@ -658,6 +729,7 @@ createApp({
       this.scoringTooltip = null;
       this.gradesExportMenuOpen = false;   // ★ v18
       this.scoringExportMenuOpen = false;  // ★ v18
+      this.scoringApplyMenuOpen = false;   // ★ 第六輪
       if (this.gradesDetailPanel) {
         if (!this._panelMousedownInside && !this._panelMouseupInside) {
           this.gradesDetailPanel = null;

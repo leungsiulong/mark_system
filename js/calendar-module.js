@@ -1,5 +1,5 @@
 // ================================================================
-// Calendar Module (v8 — assignment categories, assignment default fullMark = 10)
+// Calendar Module (v10 — termDates-aware term auto-select + default fullMark)
 // ================================================================
 const CalendarMethods = {
   // ---------- Month navigation ----------
@@ -36,9 +36,11 @@ const CalendarMethods = {
     this.openCalendarAddModal(day.date);
   },
 
-  openCalendarAddModal(date) {
+  // ★ v9: async — 先確保預選學年完整載入，否則骨架學年 terms 為空
+  async openCalendarAddModal(date) {
     const dateStr = this.dateToStr(date);
     const preYearId = this.currentAcademicYearId || (this.academicYears.length > 0 ? this.academicYears[0].id : null);
+    if (preYearId) await this.ensureYearLoaded(preYearId);
     let preClassId = null, preTermId = null;
     if (preYearId) {
       const yr = this.academicYears.find(y => y.id === preYearId);
@@ -59,7 +61,7 @@ const CalendarMethods = {
       termId: preTermId,
       type: 'assignment',
       name: '',
-      fullMark: 10, // ★ default type assignment → 10
+      fullMark: 10, // ★ 預設類型為課業 → 10（其他類型於 onCalModalTypeChange 改讀 settings.defaultFullMark）
       notes: '',
       assignmentCategoryId: '', _newAsgCatName: '',
       hasSubItems: false, subItems: [],
@@ -69,15 +71,26 @@ const CalendarMethods = {
     });
   },
 
+  // ★ 第六輪：優先用 settings.termDates 判斷日期所屬學期，未設定才退回月份規則
   _autoSelectTermByDate(cls, date) {
     if (!cls.terms || cls.terms.length === 0) return null;
     if (cls.terms.length === 1) return cls.terms[0].id;
+    const td = (this.settings && this.settings.termDates) || {};
+    const idx = this._resolveTermIndexByDates(td, date);
+    if (idx !== null) return cls.terms[Math.min(idx, cls.terms.length - 1)].id;
+    // 退回月份規則
     const m = date.getMonth() + 1;
     if (m >= 9 || m === 1) return cls.terms[0].id;
     return cls.terms[Math.min(1, cls.terms.length - 1)].id;
   },
 
-  onCalModalYearChange() { this.modalData.classId = null; this.modalData.termId = null; this.modalData.name = ''; this.modalData.assignmentCategoryId = ''; this.modalData._newAsgCatName = ''; },
+  // ★ v9: async — 切換到未載入學年時先完整載入，否則班別/學期清單為空
+  async onCalModalYearChange() {
+    this.modalData.classId = null; this.modalData.termId = null; this.modalData.name = '';
+    this.modalData.assignmentCategoryId = ''; this.modalData._newAsgCatName = '';
+    if (this.modalData.yearId) await this.ensureYearLoaded(this.modalData.yearId);
+  },
+
   onCalModalClassChange() {
     this.modalData.termId = null; this.modalData.name = '';
     this.modalData.assignmentCategoryId = ''; this.modalData._newAsgCatName = '';
@@ -108,8 +121,8 @@ const CalendarMethods = {
       return;
     }
     this.modalData.type = newType;
-    // ★ assignment default fullMark = 10, others = 100
-    this.modalData.fullMark = (newType === 'assignment') ? 10 : 100;
+    // ★ 第六輪：課業預設滿分 10，其他類型改讀 settings.defaultFullMark
+    this.modalData.fullMark = (newType === 'assignment') ? 10 : this.getDefaultFullMark();
     if (newType !== 'assignment') {
       this.modalData.assignmentCategoryId = '';
       this.modalData._newAsgCatName = '';

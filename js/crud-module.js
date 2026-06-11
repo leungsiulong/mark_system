@@ -1,6 +1,6 @@
 // ================================================================
-// CRUD Operations (v11 — assignment categories, blank default name,
-//                        assignment default fullMark = 10, removed name templates)
+// CRUD Operations (v13 — settings termDates/templates 保護；
+//   新增評估非課業預設滿分讀 settings.defaultFullMark；模板刪除)
 // ================================================================
 const CrudMethods = {
 
@@ -11,6 +11,7 @@ const CrudMethods = {
       this.loadingProgress = 5;
 
       this.loadingText = '正在載入基本資料...';
+      // ★ v20: 第一階段（首屏必載）：settings、globalStudents（全量）、所有學年（含骨架）
       const [settingsSnap, yearsSnap, globalSnap] = await Promise.all([
         db.collection('settings').doc('main').get(),
         db.collection('academicYears').orderBy('createdAt', 'desc').get(),
@@ -18,9 +19,13 @@ const CrudMethods = {
       ]);
       this.loadingProgress = 20;
 
+      let lastSelectedYearId = null;
       if (settingsSnap.exists) {
         const d = settingsSnap.data();
         this.settings = { ...this.settings, ...d };
+        // ★ 第六輪：結構保護，避免 v-model 綁定 termDates / templates 時出錯
+        if (!this.settings.termDates || typeof this.settings.termDates !== 'object') this.settings.termDates = {};
+        if (!Array.isArray(this.settings.templates)) this.settings.templates = [];
         if (d.themeColor) this.currentTheme = d.themeColor;
         if (d.tabOrder && Array.isArray(d.tabOrder)) {
           const valid = d.tabOrder.filter(k => ALL_TABS.find(t => t.key === k));
@@ -28,8 +33,10 @@ const CrudMethods = {
           this.tabOrder = valid;
         }
         if (d.activeQuickNavKeys && Array.isArray(d.activeQuickNavKeys)) this.activeQuickNavKeys = d.activeQuickNavKeys;
+        if (d.lastSelectedYearId) lastSelectedYearId = d.lastSelectedYearId; // ★ v20
       }
 
+      // ★ v20: globalStudents 維持全量（資料量通常小，且連結 / 同名 / 未載入學年人數推導皆依賴它）
       this.globalStudents = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       if (yearsSnap.docs.length === 0) {
@@ -39,21 +46,22 @@ const CrudMethods = {
         return;
       }
 
+      // ★ v20: 第二階段 — 載入所有學年的「班別骨架」（classes 基本資料；不含 students/terms/assessments）
       this.loadingText = '正在載入班別資料...';
       const yearDocs = yearsSnap.docs;
       const classesPerYearPromises = yearDocs.map(yD =>
         db.collection('academicYears').doc(yD.id).collection('classes').orderBy('createdAt').get()
       );
       const classesPerYearSnaps = await Promise.all(classesPerYearPromises);
-      this.loadingProgress = 40;
+      this.loadingProgress = 45;
 
       const years = yearDocs.map((yD, i) => {
-        const year = { id: yD.id, ...yD.data(), classes: [] };
+        // ★ v20: _loaded / _loading 為「學年完整載入」狀態旗標
+        const year = { id: yD.id, ...yD.data(), classes: [], _loaded: false, _loading: false };
         const cs = classesPerYearSnaps[i];
         year.classes = cs.docs.map(cD => {
           const cls = { id: cD.id, ...cD.data(), students: [], terms: [], _yearId: yD.id };
           if (!cls.customCategories) cls.customCategories = [];
-          // ★ v13: assignment categories
           if (!cls.assignmentCategories) cls.assignmentCategories = [];
 
           if (!cls.classType) {
@@ -77,51 +85,86 @@ const CrudMethods = {
         return year;
       });
 
-      const allClasses = [];
-      years.forEach(year => year.classes.forEach(cls => allClasses.push(cls)));
+      this.academicYears = years;
 
-      if (allClasses.length === 0) {
-        this.academicYears = years;
-        if (years.length > 0) this.expandedYears = { [years[0].id]: true };
-        this.loadingProgress = 100;
-        this.loading = false;
-        return;
-      }
+      // ★ v20: 決定「當前學年」：優先上次選取，否則最新（desc 第一筆）
+      let initialYearId = (lastSelectedYearId && years.find(y => y.id === lastSelectedYearId))
+        ? lastSelectedYearId : years[0].id;
+      this.expandedYears = { [initialYearId]: true };
 
-      this.loadingText = '正在載入學生及學期...';
-      const studentsPromises = allClasses.map(cls =>
-        db.collection('academicYears').doc(cls._yearId).collection('classes').doc(cls.id)
+      // ★ v20: 第三階段 — 僅對「當前學年」執行完整載入（students / terms / assessments）
+      this.loadingText = '正在載入當前學年詳細資料...';
+      this.loadingProgress = 60;
+      await this.loadYearData(initialYearId);
+      this.loadingProgress = 95;
+
+      // ★ v20: 設定當前學年（跳過此次 lastSelectedYearId 的重複寫入）
+      this._skipYearWatchSave = true;
+      this.currentAcademicYearId = initialYearId;
+
+      this.loadingText = '完成';
+      this.loadingProgress = 100;
+
+      setTimeout(() => { this.loading = false; }, 150);
+    } catch (err) {
+      console.error(err); this.error = err.message; this.loading = false;
+      this.addToast('載入數據失敗:' + err.message, 'error');
+    }
+  },
+
+  // ★ v20: 完整載入指定學年（students / terms / assessments）。防重入 + 並發共享 promise。
+  loadYearData(yearId) {
+    const year = this.academicYears.find(y => y.id === yearId);
+    if (!year) return Promise.resolve();
+    if (year._loaded) return Promise.resolve();
+    if (!this._yearLoadPromises) this._yearLoadPromises = {};
+    if (this._yearLoadPromises[yearId]) return this._yearLoadPromises[yearId];
+    const p = this._doLoadYearData(year, yearId)
+      .catch(err => {
+        console.error('loadYearData failed:', yearId, err);
+        this.addToast('載入學年資料失敗：' + err.message, 'error');
+        throw err;
+      })
+      .finally(() => { if (this._yearLoadPromises) delete this._yearLoadPromises[yearId]; });
+    this._yearLoadPromises[yearId] = p;
+    return p;
+  },
+
+  async _doLoadYearData(year, yearId) {
+    year._loading = true;
+    try {
+      const classes = year.classes || [];
+      if (classes.length === 0) { year._loaded = true; return; }
+
+      const studentsPromises = classes.map(cls =>
+        db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id)
           .collection('students').orderBy('studentNumber').get()
       );
-      const termsPromises = allClasses.map(cls =>
-        db.collection('academicYears').doc(cls._yearId).collection('classes').doc(cls.id)
+      const termsPromises = classes.map(cls =>
+        db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id)
           .collection('terms').get()
       );
       const [studentsSnaps, termsSnaps] = await Promise.all([
         Promise.all(studentsPromises),
         Promise.all(termsPromises)
       ]);
-      this.loadingProgress = 65;
 
-      allClasses.forEach((cls, i) => {
+      classes.forEach((cls, i) => {
         cls.students = studentsSnaps[i].docs.map(d => ({ id: d.id, ...d.data() }));
         cls.terms = termsSnaps[i].docs.map(tD => ({
-          id: tD.id, ...tD.data(), assessments: [], _classId: cls.id, _yearId: cls._yearId
+          id: tD.id, ...tD.data(), assessments: [], _classId: cls.id, _yearId: yearId
         }));
       });
 
-      this.loadingText = '正在載入評估項目...';
       const allTerms = [];
-      allClasses.forEach(cls => cls.terms.forEach(t => allTerms.push(t)));
+      classes.forEach(cls => cls.terms.forEach(t => allTerms.push(t)));
 
       if (allTerms.length > 0) {
         const assessmentsPromises = allTerms.map(t =>
-          db.collection('academicYears').doc(t._yearId).collection('classes').doc(t._classId)
+          db.collection('academicYears').doc(yearId).collection('classes').doc(t._classId)
             .collection('terms').doc(t.id).collection('assessments').orderBy('order').get()
         );
         const assessmentsSnaps = await Promise.all(assessmentsPromises);
-        this.loadingProgress = 90;
-
         allTerms.forEach((t, i) => {
           t.assessments = assessmentsSnaps[i].docs.map(d => {
             const data = { id: d.id, ...d.data() };
@@ -138,18 +181,59 @@ const CrudMethods = {
         });
       }
 
-      allClasses.forEach(cls => delete cls._yearId);
+      year._loaded = true;
 
-      this.loadingText = '完成';
-      this.loadingProgress = 100;
-      this.academicYears = years;
-      if (years.length > 0) this.expandedYears = { [years[0].id]: true };
-
-      setTimeout(() => { this.loading = false; }, 150);
-    } catch (err) {
-      console.error(err); this.error = err.message; this.loading = false;
-      this.addToast('載入數據失敗:' + err.message, 'error');
+      // ★ v20: 若剛載入的正是目前選取中的學年與班別，補跑相依初始化
+      // （避免在骨架狀態下 gradesTermId / scoringWeights 被設成空值）
+      if (yearId === this.currentAcademicYearId && this.currentClassId) {
+        this.$nextTick(() => {
+          this.gradesAutoSelectTerm();
+          this.initScoringWeights();
+          if (this.currentView === 'analysis') setTimeout(() => this.analysisRenderAllCharts(), 80);
+        });
+      }
+    } finally {
+      year._loading = false;
     }
+  },
+
+  // ★ v20: 確保「單一學年」已完整載入（附 UI 載入狀態）
+  async ensureYearLoaded(yearId) {
+    const year = this.academicYears.find(y => y.id === yearId);
+    if (!year || year._loaded) return;
+    this.yearLoading = true;
+    this.yearLoadingText = '正在載入「' + (year.name || '學年') + '」資料...';
+    try { await this.loadYearData(yearId); }
+    catch (e) { /* toast 已於 loadYearData 顯示，保留可重試 */ }
+    finally { this.yearLoading = false; }
+  },
+
+  // ★ v20: 確保「指定多個學年」已載入（跨學年分析按需只載相關學年）
+  async ensureYearsLoaded(yearIds) {
+    const ids = [...new Set(yearIds || [])].filter(id => {
+      const y = this.academicYears.find(yy => yy.id === id);
+      return y && !y._loaded;
+    });
+    if (!ids.length) return;
+    this.yearLoading = true;
+    this.yearLoadingText = '正在載入跨學年資料...';
+    try { for (const id of ids) await this.loadYearData(id); }
+    catch (e) { /* 個別錯誤已 toast */ }
+    finally { this.yearLoading = false; }
+  },
+
+  // ★ v20: 確保「所有」學年皆已完整載入（供需要全量資料的功能，例如批次3資料備份匯出）
+  async ensureAllYearsLoaded() {
+    const unloaded = this.academicYears.filter(y => !y._loaded);
+    if (!unloaded.length) return;
+    this.yearLoading = true;
+    try {
+      for (const y of unloaded) {
+        this.yearLoadingText = '正在準備備份資料… 載入「' + (y.name || '學年') + '」';
+        await this.loadYearData(y.id);
+      }
+    } catch (e) { /* 個別錯誤已 toast */ }
+    finally { this.yearLoading = false; }
   },
 
   _getLinkedClasses(yearId, cls) {
@@ -182,7 +266,8 @@ const CrudMethods = {
     const name = (this.modalData.name || '').trim();
     if (!name) { this.addToast('請輸入學年名稱', 'warning'); return; }
     const dr = await db.collection('academicYears').add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    this.academicYears.unshift({ id: dr.id, name, createdAt: new Date(), classes: [] });
+    // ★ v20: 新建空學年無需懶載入 → 直接標記為已載入
+    this.academicYears.unshift({ id: dr.id, name, createdAt: new Date(), classes: [], _loaded: true, _loading: false });
     this.expandedYears = { ...this.expandedYears, [dr.id]: true };
     this.closeModal(); this.addToast('學年「' + name + '」已建立', 'success');
   },
@@ -199,6 +284,8 @@ const CrudMethods = {
 
   async deleteAcademicYear(yearId) {
     const year = this.academicYears.find(y => y.id === yearId); if (!year) return;
+    // ★ v20: 刪除前確保該學年已完整載入，避免漏刪未載入的 students / assessments
+    await this.ensureYearLoaded(yearId);
     const deletionPromises = [];
     for (const cls of year.classes) {
       for (const s of cls.students) deletionPromises.push(db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).collection('students').doc(s.id).delete());
@@ -513,6 +600,8 @@ const CrudMethods = {
     const year = this.academicYears.find(y => y.id === yearId);
     const cls = year?.classes.find(c => c.id === classId);
     if (!cls) return;
+    // ★ v20: 確保學年完整載入再刪除（避免漏刪 students / assessments）
+    await this.ensureYearLoaded(yearId);
 
     const targets = [cls];
     if (cls.classType === 'regular') {
@@ -755,13 +844,13 @@ const CrudMethods = {
     this.addToast(msg, 'success');
   },
 
-  // ★ v11: name default blank (teacher input); assignment default fullMark = 10
+  // ★ 第六輪：name default blank（teacher input）；課業預設 10，其他類型讀 settings.defaultFullMark
   openAddAssessmentModal(type, period, customCategoryId) {
     if (!this.gradesTerm) return;
     this.openModal('addAssessment', {
       type, period: period || null, customCategoryId: customCategoryId || null,
       name: '',
-      fullMark: type === 'assignment' ? 10 : 100,
+      fullMark: type === 'assignment' ? 10 : this.getDefaultFullMark(),
       date: '', notes: '',
       assignmentCategoryId: '', _newAsgCatName: '',
       hasSubItems: false, subItems: [],
@@ -1158,6 +1247,7 @@ const CrudMethods = {
       case 'student': await this.deleteStudent(yearId, classId, id); break;
       case 'assessment': await this.deleteAssessmentDoc(yearId, classId, this.modalData.termId, id); break;
       case 'customCategory': await this.deleteCustomCategory(yearId, classId, id); break;
+      case 'template': await this.deleteTemplate(id); break; // ★ 第六輪
     }
     this.closeModal();
   }
