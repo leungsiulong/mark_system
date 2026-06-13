@@ -1,5 +1,11 @@
 // ================================================================
-// Main Application (v21 — settings module: basic / termDates / templates)
+// Main Application (v25 — 
+//   req1) frozen column z-index + highlight bg fix (cell selection no longer covers frozen cols)
+//   req2) new-student match badge has no hover tooltip
+//   req3) match status only shown in subject/elective classes (not regular)
+//   req4) desktop calendar taller cells + prettier event pills (calMonthEventLimit)
+//   req5) cross-year analysis: tree-based year→class→student selection
+//   req6) clicking cross-year tab resets back to search/select page)
 // ================================================================
 const { createApp } = Vue;
 
@@ -7,7 +13,7 @@ createApp({
   data() {
     return {
       loading: true, loadingText: '正在載入數據...', loadingProgress: 0,
-      yearLoading: false, yearLoadingText: '', // ★ v20: 學年懶載入覆蓋層狀態
+      yearLoading: false, yearLoadingText: '',
       error: null, academicYears: [], globalStudents: [],
       settings: { schoolName:'', teacherName:'', defaultFullMark:100, termDates:{}, templates:[] },
       currentView: 'home', currentAcademicYearId: null, currentClassId: null,
@@ -20,6 +26,8 @@ createApp({
       calendarTypeFilter: { assignment: true, quiz: true, unified_test: true, exam: true },
       calendarEventPopover: null,
       calendarMoreEventsModal: null,
+      // ★ req4: 桌面大屏每格顯示更多項目（month view）
+      calMonthEventLimit: 2,
 
       dayNames: ['日','一','二','三','四','五','六'],
       allTabs: ALL_TABS,
@@ -29,7 +37,7 @@ createApp({
       activeQuickNavKeys: ['grades','scoring','analysis','yearMgmt'],
       settingsNav: [],
       settingsYearTab: 'classes',
-      settingsSaveStatus: '', // ★ 第六輪：基本設定 / 學期日期自動儲存狀態
+      settingsSaveStatus: '',
       showModal: false, modalType: null, modalData: {},
       toasts: [], toastCounter: 0,
       studentSortKey: 'studentNumber', studentSortAsc: true,
@@ -47,7 +55,6 @@ createApp({
       gradesDragStartCell: null,
       gradesDetailEditFullMark: '',
       gradesDisplayMode: 'raw',
-      // ★ v18: 觸控介面狀態 + 匯出選單
       gradesIsTouchDevice: false,
       gradesActivelyEditing: false,
       gradesExportMenuOpen: false,
@@ -57,13 +64,12 @@ createApp({
       ],
 
       scoringSubTab: 'settings',
-      // ★ 計分設定所有選單預設摺疊
       scoringAccordion: { attribution: false, ut: false, exam: false, yearly: false },
       scoringSaveStatus: '',
       scoringTooltip: null,
       scoringCopyMenuOpen: false,
-      scoringExportMenuOpen: false, // ★ v18
-      scoringApplyMenuOpen: false, // ★ 第六輪：套用計分模板下拉
+      scoringExportMenuOpen: false,
+      scoringApplyMenuOpen: false,
       scoringCopyColumns: { a3: true, a1: false, a2: false, examTotal: true },
       scoringReportSortKey: 'className',
       scoringReportSortAsc: true,
@@ -82,19 +88,27 @@ createApp({
       analysisTrendSelectedStudents: [],
       analysisCrossYearSearchQuery: '',
       analysisCrossYearStudent: null,
+      // ★ req5: 跨學年樹狀選擇展開狀態
+      analysisCrossYearExpandedYears: {},
+      analysisCrossYearExpandedClasses: {},
       analysisOverviewSortKey: null,
       analysisOverviewSortAsc: true,
       analysisRankingSortKey: 'yearlyRank',
       analysisRankingSortAsc: true,
       analysisStudentSortKey: 'diff',
       analysisStudentSortAsc: false,
-      analysisOverviewAssignmentCollapsed: true
-    };
+      analysisOverviewAssignmentCollapsed: true,
+
+      editMatchSearchQuery: '',
+
+      // ★ v25: 自訂匹配狀態 tooltip
+      matchTooltip: null,
+      matchTooltipTimer: null,
+      matchTooltipDelay: 0    };
   },
 
   computed: {
     themeColors() { return this.colorThemes.find(t => t.key === this.currentTheme) || this.colorThemes[0]; },
-    // ★ v19: 全部主色相關 style 改用 CSS variables，主題切換即時生效
     headerStyle() { return { background:'linear-gradient(135deg, var(--theme-gradient-from), var(--theme-primary), var(--theme-secondary))' }; },
     bannerStyle() { return { background:'radial-gradient(circle at 85% 10%, rgba(255,255,255,0.25), transparent 18rem), linear-gradient(135deg, var(--theme-gradient-from), var(--theme-primary) 55%, var(--theme-secondary))' }; },
     activeTabStyle() { return { background:'linear-gradient(135deg, var(--theme-primary), var(--theme-secondary))', color:'#fff', borderColor:'transparent', borderRadius:'999px', boxShadow:'0 10px 24px rgba(var(--theme-primary-rgb),0.22)' }; },
@@ -128,6 +142,10 @@ createApp({
     settingsClass() { if (!this.settingsYear||!this.settingsCurrentClassId) return null; return this.settingsYear.classes.find(c => c.id === this.settingsCurrentClassId) || null; },
     settingsStudents() { return this.settingsClass ? this.settingsClass.students : []; },
     isSettingsClassElective() { return this.settingsClass && this.settingsClass.classType === 'elective'; },
+    // ★ req3: 匹配狀態僅在「科目 / 選修」班別有意義（一般班別可能連結多個科目，故不顯示）
+    isSettingsClassMatchable() {
+      return !!(this.settingsClass && (this.settingsClass.classType === 'subject' || this.settingsClass.classType === 'elective'));
+    },
     settingsSortedStudents() {
       const arr = [...this.settingsStudents];
       if (this.isSettingsClassElective) {
@@ -158,14 +176,18 @@ createApp({
       return r;
     },
 
-    // ★ v20: 由 globalStudents records 推導各學年/各班學生數
-    //   （供「未完整載入」的學年在側欄、設定頁仍顯示正確人數；computed 會隨 globalStudents 變動自動更新）
     _yearStudentCountMap() {
       const map = {};
       for (const g of this.globalStudents) {
-        const seen = new Set();
+        const seenSubjectYears = new Set();
         for (const r of (g.records || [])) {
-          if (r.academicYearId && !seen.has(r.academicYearId)) { seen.add(r.academicYearId); map[r.academicYearId] = (map[r.academicYearId] || 0) + 1; }
+          if (!r.academicYearId || !r.classId) continue;
+          if (seenSubjectYears.has(r.academicYearId)) continue;
+          const cls = this.getClassObj(r.academicYearId, r.classId);
+          if (cls && (cls.classType === 'subject' || cls.classType === 'elective')) {
+            seenSubjectYears.add(r.academicYearId);
+            map[r.academicYearId] = (map[r.academicYearId] || 0) + 1;
+          }
         }
       }
       return map;
@@ -208,6 +230,7 @@ createApp({
         editClass:'編輯班別',
         addSubject:'新增科目',
         addStudent:'新增學生', editStudent:'編輯學生',
+        editStudentMatch:'修改學生匹配',
         batchImport:'批量匯入學生',
         deleteConfirm:'確認刪除',
         addAssessment:'新增評估項目', editAssessment:'編輯評估項目',
@@ -285,13 +308,28 @@ createApp({
       return result;
     },
 
+    modalCurrentMatchedGlobal() {
+      if (this.modalType !== 'editStudentMatch') return null;
+      const gid = this.modalData.currentGlobalStudentId;
+      if (!gid) return null;
+      return this.globalStudents.find(g => g.id === gid) || null;
+    },
+
+    modalEditMatchSearchResults() {
+      if (this.modalType !== 'editStudentMatch') return [];
+      const q = (this.editMatchSearchQuery || '').trim().toLowerCase();
+      if (q.length < 1) return [];
+      const currentGid = this.modalData.currentGlobalStudentId;
+      return this.globalStudents
+        .filter(g => g.id !== currentGid && (g.name || '').toLowerCase().indexOf(q) >= 0)
+        .slice(0, 30);
+    },
+
     ...GradesComputed, ...ScoringComputed, ...CalendarComputed, ...AnalysisComputed, ...SettingsComputed,
   },
 
   watch: {
-    // ★ v19: 主題改變時，無論透過什麼途徑，都重寫 CSS variables
     currentTheme() { this.$nextTick(() => this.applyThemeTokens()); },
-    // ★ v20: 切換學年 → 懶載入該學年 + 記住選取（防破壞既有 currentClassId 一致性檢查）
     currentAcademicYearId(nv, ov) {
       if (nv === ov) return;
       if (this.currentClassId) {
@@ -301,7 +339,6 @@ createApp({
       this.gradesResetFocus();
       if (nv) {
         const yr = this.academicYears.find(y => y.id === nv);
-        // 安全網：任何直接改 currentAcademicYearId 而未先載入者，於此非阻塞觸發載入
         if (yr && !yr._loaded && !yr._loading) this.ensureYearLoaded(nv);
         if (this._skipYearWatchSave) this._skipYearWatchSave = false;
         else this._saveLastSelectedYear(nv);
@@ -358,7 +395,6 @@ createApp({
       handler() { this.$nextTick(() => this.analysisRenderTrend()); },
       deep: true
     },
-    // ★ v20: 跨學年分析需相關學年完整資料 → 先按需載入再渲染（computed 載入後自動重算）
     analysisCrossYearStudent(gs) {
       if (gs) {
         const yearIds = [...new Set((gs.records || []).map(r => r.academicYearId))];
@@ -387,8 +423,15 @@ createApp({
     assessmentDot(type) { return {'bg-blue-500':type==='assignment','bg-green-500':type==='quiz','bg-orange-500':type==='unified_test','bg-red-500':type==='exam','bg-purple-500':type==='class_performance','bg-teal-500':type==='custom'}; },
     assessmentLabel(type) { return {assignment:'課業',quiz:'小測',unified_test:'統測',exam:'考試',class_performance:'課堂表現',custom:'自訂'}[type]||type; },
 
+    // ★ req4: 依視窗寬度決定月曆每格顯示項目數量（桌面更多）
+    _updateCalMonthEventLimit() {
+      const w = window.innerWidth || document.documentElement.clientWidth;
+      if (w >= 1280) this.calMonthEventLimit = 4;
+      else if (w >= 1024) this.calMonthEventLimit = 3;
+      else this.calMonthEventLimit = 2;
+    },
+
     toggleYear(yearId) { this.expandedYears={...this.expandedYears,[yearId]:!this.expandedYears[yearId]}; },
-    // ★ v20: 切換學年前先確保完整載入（await 完成後再設定 class，避免 watcher 在骨架狀態下初始化空值）
     async selectFromTree(yearId, classId) {
       if (window.innerWidth < 1024) this.leftPanelOpen = false;
       await this.ensureYearLoaded(yearId);
@@ -399,17 +442,20 @@ createApp({
 
     yearStudentCount(y) {
       if (y && y._loaded) {
-        const seen = new Set();
-        for (const c of y.classes) for (const s of (c.students || [])) seen.add(s.globalStudentId || s.id);
-        return seen.size;
+        const seenGidsWithSubject = new Set();
+        for (const c of y.classes) {
+          if (c.classType !== 'subject' && c.classType !== 'elective') continue;
+          for (const s of (c.students || [])) {
+            seenGidsWithSubject.add(s.globalStudentId || s.id);
+          }
+        }
+        return seenGidsWithSubject.size;
       }
-      // ★ v20: 骨架學年改由 globalStudents records 推導學生數
       return this._yearStudentCountMap[y.id] || 0;
     },
     yearRegularCount(y) { return y.classes.filter(c => c.classType === 'regular').length; },
     yearSubjectCount(y) { return y.classes.filter(c => c.classType === 'subject' || c.classType === 'elective').length; },
 
-    // ★ v20: 側欄班別學生數（未載入學年由 globalStudents records 推導）
     treeClassStudentCount(y, c) {
       if (y && y._loaded) return (c.students || []).length;
       return this._classStudentCountMap[c.id] || 0;
@@ -428,6 +474,31 @@ createApp({
       return year.classes.some(c => c.classType === 'subject' && c.className === cls.className && c.subject === subjectName);
     },
 
+    globalStudentSubjectRecordsCount(gs) {
+      if (!gs || !gs.records) return 0;
+      let count = 0;
+      const seenYearSubject = new Set();
+      for (const r of gs.records) {
+        const cls = this.getClassObj(r.academicYearId, r.classId);
+        if (!cls) continue;
+        if (cls.classType !== 'subject' && cls.classType !== 'elective') continue;
+        const key = r.academicYearId + '||' + (cls.subject || '') + '||' + cls.id;
+        if (seenYearSubject.has(key)) continue;
+        seenYearSubject.add(key);
+        count++;
+      }
+      return count;
+    },
+
+    globalStudentHasSubjectRecord(gs) {
+      if (!gs || !gs.records) return false;
+      for (const r of gs.records) {
+        const cls = this.getClassObj(r.academicYearId, r.classId);
+        if (cls && (cls.classType === 'subject' || cls.classType === 'elective')) return true;
+      }
+      return false;
+    },
+
     _findStudentOriginClass(yearId, student) {
       if (!student) return '';
       const year = this.academicYears.find(y => y.id === yearId);
@@ -443,6 +514,295 @@ createApp({
 
     getStudentOriginClass(student) { return this._findStudentOriginClass(this.currentAcademicYearId, student); },
     getSettingsStudentOriginClass(student) { return this._findStudentOriginClass(this.settingsCurrentYearId, student); },
+
+    // ============================================================
+    // Student match status (used in students management table)
+    // ============================================================
+    getStudentMatchStatus(student) {
+      if (!student.globalStudentId) {
+        return { type: 'unlinked', label: '未連結', icon: 'fa-unlink', color: 'gray' };
+      }
+      const gs = this.globalStudents.find(g => g.id === student.globalStudentId);
+      if (!gs) {
+        return { type: 'unlinked', label: '未連結', icon: 'fa-unlink', color: 'gray' };
+      }
+      const currentYearId = this.settingsCurrentYearId;
+      const seenOtherYears = new Set();
+      for (const r of (gs.records || [])) {
+        if (r.academicYearId && r.academicYearId !== currentYearId) {
+          const cls = this.getClassObj(r.academicYearId, r.classId);
+          if (cls && (cls.classType === 'subject' || cls.classType === 'elective')) {
+            seenOtherYears.add(r.academicYearId);
+          }
+        }
+      }
+      if (seenOtherYears.size === 0) {
+        return { type: 'new', label: '新學生', icon: 'fa-star', color: 'blue' };
+      }
+      return { 
+        type: 'matched', 
+        label: '已匹配 ' + seenOtherYears.size + ' 個學年',
+        icon: 'fa-link',
+        color: 'green'
+      };
+    },
+
+    getMatchStatusBadgeClass(status) {
+      switch (status.color) {
+        case 'green': return 'bg-green-100 text-green-700 border border-green-200';
+        case 'blue':  return 'bg-blue-100 text-blue-700 border border-blue-200';
+        case 'gray':
+        default:      return 'bg-gray-100 text-gray-600 border border-gray-200';
+      }
+    },
+
+    // Tooltip text for the match status badge.
+    getStudentMatchTooltip(student) {
+      if (!student) return '';
+      const status = this.getStudentMatchStatus(student);
+      if (!student.globalStudentId) {
+        return '此學生尚未連結至全域學生記錄\n（沒有跨學年追蹤資料）';
+      }
+      const gs = this.globalStudents.find(g => g.id === student.globalStudentId);
+      if (!gs) {
+        return '此學生的連結記錄已遺失，請點擊「修改匹配」重新連結';
+      }
+      const lines = [];
+      lines.push('學生：' + (gs.name || student.studentName));
+
+      const yearMap = {};
+      for (const r of (gs.records || [])) {
+        if (!r.academicYearId) continue;
+        if (!yearMap[r.academicYearId]) yearMap[r.academicYearId] = [];
+        yearMap[r.academicYearId].push(r);
+      }
+
+      const orderedYearIds = this.academicYears.map(y => y.id).filter(yid => yearMap[yid]);
+      for (const yid in yearMap) {
+        if (!orderedYearIds.includes(yid)) orderedYearIds.push(yid);
+      }
+
+      if (status.type === 'new') {
+        lines.push('狀態：新學生（首次出現）');
+      } else if (status.type === 'matched') {
+        lines.push('狀態：已匹配 ' + (orderedYearIds.length - (yearMap[this.settingsCurrentYearId] ? 1 : 0)) + ' 個其他學年');
+      }
+
+      lines.push('───── 跨學年記錄 ─────');
+      for (const yid of orderedYearIds) {
+        const year = this.academicYears.find(y => y.id === yid);
+        const yearName = year ? year.name : '(未知學年)';
+        const isCurrent = yid === this.settingsCurrentYearId;
+        const prefix = isCurrent ? '▸ ' : '• ';
+        const labels = [];
+        for (const r of yearMap[yid]) {
+          const cls = this.getClassObj(r.academicYearId, r.classId);
+          if (!cls) continue;
+          let label = cls.className;
+          if (cls.subject) label += ' - ' + cls.subject;
+          if (cls.classType === 'elective') label += ' ★選修';
+          else if (cls.classType === 'regular') label += '（一般）';
+          labels.push(label);
+        }
+        if (labels.length === 0) {
+          lines.push(prefix + yearName + ' (無資料)');
+        } else {
+          lines.push(prefix + yearName + (isCurrent ? '（本學年）' : ''));
+          for (const lbl of labels) {
+            lines.push('   · ' + lbl);
+          }
+        }
+      }
+
+      return lines.join('\n');
+    },
+
+    // ★ req2: 新學生不顯示 hover tooltip（呼叫端已守門，這裡再保險判斷一次）
+    showMatchTooltip(student, event) {
+      if (this.getStudentMatchStatus(student).type === 'new') return;
+
+      if (this.matchTooltipTimer) {
+        clearTimeout(this.matchTooltipTimer);
+        this.matchTooltipTimer = null;
+      }
+
+      const text = this.getStudentMatchTooltip(student);
+      if (!text) return;
+
+      const delay = Number(this.matchTooltipDelay) || 0;
+
+      const show = () => {
+        const pos = this._calcMatchTooltipPosition(event);
+        this.matchTooltip = {
+          text,
+          x: pos.x,
+          y: pos.y,
+          transform: pos.transform
+        };
+      };
+
+      if (delay > 0) {
+        this.matchTooltipTimer = setTimeout(show, delay);
+      } else {
+        show();
+      }
+    },
+
+    moveMatchTooltip(event) {
+      if (!this.matchTooltip) return;
+      const pos = this._calcMatchTooltipPosition(event);
+      this.matchTooltip = {
+        ...this.matchTooltip,
+        x: pos.x,
+        y: pos.y,
+        transform: pos.transform
+      };
+    },
+
+    hideMatchTooltip() {
+      if (this.matchTooltipTimer) {
+        clearTimeout(this.matchTooltipTimer);
+        this.matchTooltipTimer = null;
+      }
+      this.matchTooltip = null;
+    },
+
+    _calcMatchTooltipPosition(event) {
+      const margin = 12;
+      const viewportW = window.innerWidth || document.documentElement.clientWidth;
+      const viewportH = window.innerHeight || document.documentElement.clientHeight;
+
+      let x = event.clientX;
+      let y = event.clientY - 14;
+      let transform = 'translate(-50%, -100%)';
+
+      const halfWidth = 220;
+      if (x < halfWidth + margin) {
+        x = margin;
+        transform = 'translate(0, -100%)';
+      } else if (x > viewportW - halfWidth - margin) {
+        x = viewportW - margin;
+        transform = 'translate(-100%, -100%)';
+      }
+
+      if (y < 120) {
+        y = event.clientY + 18;
+        if (transform === 'translate(-50%, -100%)') transform = 'translate(-50%, 0)';
+        else if (transform === 'translate(0, -100%)') transform = 'translate(0, 0)';
+        else if (transform === 'translate(-100%, -100%)') transform = 'translate(-100%, 0)';
+      }
+
+      if (y > viewportH - margin) y = viewportH - margin;
+
+      return { x, y, transform };
+    },
+
+    async openEditStudentMatchModal(student) {
+      const yearId = this.settingsCurrentYearId;
+      const classId = this.settingsCurrentClassId;
+      if (!yearId || !classId) { this.addToast('請先選擇班別', 'warning'); return; }
+
+      let candidates = [];
+      let sameNameGlobals = [];
+      try {
+        const cands = await this._buildStudentMatchCandidates(yearId, classId, student.studentName);
+        candidates = cands.previousYearCandidates;
+        sameNameGlobals = cands.sameNameGlobals.filter(g => g.id !== student.globalStudentId);
+      } catch (e) {
+        console.error('build candidates failed', e);
+      }
+
+      this.editMatchSearchQuery = '';
+      this.openModal('editStudentMatch', {
+        studentId: student.id,
+        studentNumber: student.studentNumber,
+        studentName: student.studentName,
+        yearId, classId,
+        currentGlobalStudentId: student.globalStudentId || null,
+        candidates,
+        sameNameGlobals,
+        selectedAction: 'keep'
+      });
+    },
+
+    selectMatchOption(action) {
+      this.modalData.selectedAction = action;
+    },
+
+    selectMatchSearchCandidate(gs) {
+      this.modalData.selectedAction = 'link:' + gs.id;
+    },
+
+    // ============================================================
+    // ★ req5: 跨學年分析 — 樹狀（學年 → 科目班別 → 學生）選擇
+    // ============================================================
+    async analysisCrossYearToggleYear(yearId) {
+      const open = !this.analysisCrossYearExpandedYears[yearId];
+      this.analysisCrossYearExpandedYears = { ...this.analysisCrossYearExpandedYears, [yearId]: open };
+      if (open) {
+        const yr = this.academicYears.find(y => y.id === yearId);
+        if (yr && !yr._loaded && !yr._loading) {
+          await this.ensureYearLoaded(yearId);
+        }
+      }
+    },
+
+    analysisCrossYearToggleClass(classId) {
+      this.analysisCrossYearExpandedClasses = {
+        ...this.analysisCrossYearExpandedClasses,
+        [classId]: !this.analysisCrossYearExpandedClasses[classId]
+      };
+    },
+
+    analysisCrossYearClassesForYear(y) {
+      if (!y || !y.classes) return [];
+      return y.classes
+        .filter(c => c.classType === 'subject' || c.classType === 'elective')
+        .slice()
+        .sort((a, b) => {
+          if (a.classType !== b.classType) return a.classType === 'subject' ? -1 : 1;
+          const cn = a.className.localeCompare(b.className);
+          if (cn !== 0) return cn;
+          return (a.subject || '').localeCompare(b.subject || '');
+        });
+    },
+
+    analysisCrossYearSortedStudents(c) {
+      const arr = [...(c.students || [])];
+      arr.sort((a, b) => (parseInt(a.studentNumber) || 0) - (parseInt(b.studentNumber) || 0));
+      return arr;
+    },
+
+    // 從樹狀點選學生 → 找到（或建立）對應的全域學生記錄後顯示分析
+    async analysisSelectCrossYearStudentFromTree(student) {
+      let gid = student.globalStudentId;
+      let gs = gid ? this.globalStudents.find(g => g.id === gid) : null;
+
+      if (!gs) {
+        // 沒有全域記錄：嘗試用同名全域記錄；否則提示無跨學年資料
+        const sameName = this.globalStudents.filter(g => (g.name || '').trim() === (student.studentName || '').trim());
+        if (sameName.length === 1) {
+          gs = sameName[0];
+        } else if (sameName.length > 1) {
+          this.addToast('此學生尚未連結全域記錄，且有多位同名學生，請改用姓名搜尋或先於「學生管理」修改匹配', 'warning');
+          return;
+        } else {
+          this.addToast('此學生尚未連結任何跨學年記錄', 'info');
+          return;
+        }
+      }
+
+      this.analysisSelectCrossYearStudent(gs);
+    },
+
+    // ★ req6: 點擊「跨學年分析」分頁時，重設回搜尋 / 選擇頁面
+    onAnalysisCrossYearTabClick() {
+      this.analysisClearCrossYearStudent();
+      this.analysisCrossYearSearchQuery = '';
+      this.analysisCrossYearExpandedYears = {};
+      this.analysisCrossYearExpandedClasses = {};
+      this.analysisSetTab('crossYear');
+    },
 
     scoringToggleReportHighlight(field, category) {
       if (this.scoringReportHighlight && this.scoringReportHighlight.field === field && this.scoringReportHighlight.category === category) {
@@ -471,17 +831,17 @@ createApp({
       let sub = '';
       if (c.classType === 'regular') {
         const linkedSubjects = this.classSubjectsCount(c);
-        if (linkedSubjects > 0) sub = '此班別連結了 ' + linkedSubjects + ' 個科目，將一併刪除（包含所有成績數據）。';
-        else sub = '此班別的學生名單會被刪除。';
+        if (linkedSubjects > 0) sub = '此班別連結了 ' + linkedSubjects + ' 個科目，將一併刪除（包含所有成績數據及全域學生記錄）。';
+        else sub = '此班別的學生名單會被刪除（並同步清理全域學生記錄）。';
       } else if (c.classType === 'subject') {
-        sub = '此科目的所有成績數據會被刪除（一般班別的學生名單會保留）。';
+        sub = '此科目的所有成績數據會被刪除（一般班別的學生名單會保留；全域學生記錄會同步清理此科目項）。';
       } else if (c.classType === 'elective') {
-        sub = '此選修科及其所有成績數據會被刪除。';
+        sub = '此選修科及其所有成績數據會被刪除（並同步清理全域學生記錄）。';
       }
       this.openModal('deleteConfirm', { target: 'class', id: c.id, yearId: this.settingsCurrentYearId, message: msg, submessage: sub });
     },
 
-    settingsEnter(item) { this.settingsNav=[...this.settingsNav,item]; if (item.yearId) this.ensureYearLoaded(item.yearId); }, // ★ v20: 進入學年層確保完整載入
+    settingsEnter(item) { this.settingsNav=[...this.settingsNav,item]; if (item.yearId) this.ensureYearLoaded(item.yearId); },
     settingsGoTo(idx) { this.settingsNav=this.settingsNav.slice(0,idx+1); },
     settingsBack() { if (this.settingsNav.length > 0) this.settingsNav = this.settingsNav.slice(0, -1); },
 
@@ -505,13 +865,11 @@ createApp({
       this.modalData.selectedStudentIds = this.modalData.selectedStudentIds.filter(id => !ids.has(id));
     },
 
-    // ★ v20: 記住上次選取的學年，下次啟動優先完整載入
     async _saveLastSelectedYear(yearId) {
       try { await db.collection('settings').doc('main').set({ lastSelectedYearId: yearId }, { merge: true }); }
       catch (e) { console.error('save lastSelectedYearId failed', e); }
     },
 
-    // ★ v19: 依 currentTheme 把主題色寫入 CSS variables（全站即時變色核心）
     applyThemeTokens() {
       const t = this.themeColors || {};
       const root = document.documentElement;
@@ -574,7 +932,16 @@ createApp({
       this.modalType=type;
       this.modalData={...data};
       this.showModal=true;
-      if(type==='addStudent'){this.modalData.matchedGlobal=null;this.modalData.linkToGlobal=false;}
+      if(type==='addStudent'){
+        this.modalData.matchedGlobal=null;
+        this.modalData.matchCandidates=[];
+        this.modalData.linkToGlobal=false;
+        this.modalData.matchSource=null;
+        this.modalData.selectedGlobalStudentId=null;
+        if (this.modalData.studentName && this.modalData.studentName.trim()) {
+          this.$nextTick(() => this.prepareStudentAutoMatch());
+        }
+      }
       if(type==='addClass'){
         if(!this.modalData.classType) this.modalData.classType = 'regular';
         if(!this.modalData.selectedStudentIds) this.modalData.selectedStudentIds = [];
@@ -585,8 +952,21 @@ createApp({
         if(!this.modalData.selectedClassIds) this.modalData.selectedClassIds = [];
         if(this.modalData._useNewSubject === undefined) this.modalData._useNewSubject = false;
       }
+      if(type==='editStudentMatch'){
+        this.editMatchSearchQuery = '';
+      }
     },
-    closeModal() { this.showModal=false;this.modalType=null;this.modalData={}; },
+    closeModal() {
+      this.showModal=false;
+      this.modalType=null;
+      this.modalData={};
+      this.editMatchSearchQuery = '';
+      this.hideMatchTooltip();
+      if (this._studentNameMatchTimer) {
+        clearTimeout(this._studentNameMatchTimer);
+        this._studentNameMatchTimer = null;
+      }
+    },
     async confirmModal() {
       try {
         switch(this.modalType){
@@ -597,6 +977,7 @@ createApp({
           case'addSubject':await this.addSubject();break;
           case'addStudent':await this.addStudent();break;
           case'editStudent':await this.updateStudent();break;
+          case'editStudentMatch':await this.editStudentMatchConfirm();break;
           case'batchImport':await this.batchImportStudents();break;
           case'addAssessment':await this.addAssessmentConfirm();break;
           case'editAssessment':await this.updateAssessmentConfirm();break;
@@ -613,6 +994,7 @@ createApp({
     onModalKeydown(e) {
       if (e.key !== 'Enter') return;
       if (this.modalType === 'batchImport') return;
+      if (this.modalType === 'editStudentMatch') return;
       const tag = (e.target.tagName || '').toUpperCase();
       if (tag === 'BUTTON') return;
       if (tag === 'SELECT') return;
@@ -665,12 +1047,68 @@ createApp({
         }
         .grades-cell input:focus{outline:none!important;border:none!important;box-shadow:none!important;}
         .grades-cell input::selection{background:rgba(var(--theme-primary-rgb),0.25)}
+
+        /* ★ req1: 高亮列改用「白底 + 主題色疊加」不透明背景，避免水平捲動時底下資料透出凍結欄 */
         .grades-table tr.row-hover-highlight .frozen-sn,
         .grades-table tr.row-hover-highlight .frozen-name,
-        .grades-table tr.row-hover-highlight .frozen-class { background:rgba(var(--theme-primary-rgb),0.06) !important; transition: background-color .12s }
+        .grades-table tr.row-hover-highlight .frozen-class {
+          background-image:linear-gradient(rgba(var(--theme-primary-rgb),0.06), rgba(var(--theme-primary-rgb),0.06)) !important;
+          background-color:#ffffff !important;
+          transition: background-color .12s;
+        }
         .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
-        /* ★ v18: 觸控預覽模式（已選取但未編輯）以較明顯外框提示，外框跟隨主題 */
         .grades-touch-device .grades-cell.cell-focused{outline:2px solid var(--theme-primary)!important;outline-offset:-2px}
+
+        /* ★ req1: 凍結欄必須永遠蓋在選取 / 聚焦資料格之上。
+           內文凍結欄 z-index 提升至 30（高於 cell-focused=2 / cell-selected=1），
+           表頭凍結欄 32，統計列凍結欄 29，徹底修正選取整列時左側班別/學號/姓名被覆蓋的問題。 */
+        .grades-table .frozen-sn,
+        .grades-table .frozen-name,
+        .grades-table .frozen-class { z-index: 30 !important; }
+        .grades-table thead .frozen-sn,
+        .grades-table thead .frozen-name,
+        .grades-table thead .frozen-class { z-index: 32 !important; }
+        .grades-table .stats-frozen-sn,
+        .grades-table .stats-frozen-name,
+        .grades-table .stats-frozen-class { z-index: 29 !important; }
+
+        .match-status-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:500;white-space:nowrap}
+        /* ★ req2: 有 tooltip 的徽章用 help 游標；新學生（tip-off）用一般游標 */
+        .match-status-badge.tip-on{cursor:help}
+        .match-status-badge.tip-off{cursor:default}
+        .match-status-badge.tip-on:hover{filter:brightness(0.97)}
+        .match-tooltip{max-width:420px}
+        .match-tooltip-box{
+          background:#111827;
+          color:#fff;
+          border-radius:10px;
+          box-shadow:0 18px 50px rgba(0,0,0,.28);
+          border:1px solid rgba(255,255,255,.08);
+          padding:10px 12px;
+          max-width:420px;
+          max-height:60vh;
+          overflow:auto;
+        }
+        .match-tooltip-pre{
+          margin:0;
+          white-space:pre-wrap;
+          word-break:break-word;
+          font-family:'Microsoft JhengHei','Segoe UI',sans-serif;
+          font-size:12px;
+          line-height:1.55;
+        }
+        .match-tooltip-arrow{
+          width:0;
+          height:0;
+          margin-left:auto;
+          margin-right:auto;
+          border-left:6px solid transparent;
+          border-right:6px solid transparent;
+          border-top:6px solid #111827;
+        }
+        .match-option-card{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;transition:all .15s;background:#fff}
+        .match-option-card:hover{background:#f9fafb}
+        .match-option-card.active{border-color:var(--theme-primary);background:rgba(var(--theme-primary-rgb),0.06);box-shadow:inset 0 0 0 1px var(--theme-primary)}
       `;
       document.head.appendChild(style);
     }
@@ -678,14 +1116,15 @@ createApp({
 
   async mounted() {
     if(window.innerWidth<1024) this.leftPanelOpen=false;
-    // ★ v18: 觸控介面偵測（粗指標 = 觸控螢幕）
     this.gradesIsTouchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     if (this.gradesIsTouchDevice) document.body.classList.add('grades-touch-device');
     this._injectCustomStyles();
-    this.applyThemeTokens(); // ★ v19: 預設主題先套用，避免閃白
+    this.applyThemeTokens();
+    this._updateCalMonthEventLimit(); // ★ req4
     this._analysisCharts = {};
+    this._studentNameMatchTimer = null;
     await this.loadAllData();
-    this.applyThemeTokens(); // ★ v19: 載入 Firestore themeColor 後再套用
+    this.applyThemeTokens();
     this.initScoringWeights();
     document.addEventListener('keydown',(e)=>{
       if(e.key==='Escape'){
@@ -727,9 +1166,10 @@ createApp({
       this.gradesHeaderMenu = null;
       this.scoringCopyMenuOpen = false;
       this.scoringTooltip = null;
-      this.gradesExportMenuOpen = false;   // ★ v18
-      this.scoringExportMenuOpen = false;  // ★ v18
-      this.scoringApplyMenuOpen = false;   // ★ 第六輪
+      this.gradesExportMenuOpen = false;
+      this.scoringExportMenuOpen = false;
+      this.scoringApplyMenuOpen = false;
+      this.hideMatchTooltip();
       if (this.gradesDetailPanel) {
         if (!this._panelMousedownInside && !this._panelMouseupInside) {
           this.gradesDetailPanel = null;
@@ -740,9 +1180,23 @@ createApp({
     });
 
     this.$watch(()=>this.modalData.studentName,(nv)=>{
-      if(this.modalType==='addStudent'&&nv&&nv.trim().length>0){const m=this.globalStudents.find(g=>g.name===nv.trim());this.modalData.matchedGlobal=m||null;if(!m)this.modalData.linkToGlobal=false;}
+      if (this.modalType !== 'addStudent') return;
+      if (this._studentNameMatchTimer) clearTimeout(this._studentNameMatchTimer);
+      if (!nv || !nv.trim()) {
+        this.modalData.matchedGlobal = null;
+        this.modalData.matchCandidates = [];
+        this.modalData.linkToGlobal = false;
+        this.modalData.matchSource = null;
+        this.modalData.selectedGlobalStudentId = null;
+        return;
+      }
+      this._studentNameMatchTimer = setTimeout(() => {
+        this.prepareStudentAutoMatch();
+      }, 400);
     });
+
     window.addEventListener('resize',()=>{
+      this._updateCalMonthEventLimit(); // ★ req4
       if(window.innerWidth>=1024&&this.currentView!=='home'&&this.currentView!=='settings'){
         this.leftPanelOpen=true;
       }

@@ -1,6 +1,10 @@
 // ================================================================
-// CRUD Operations (v13 — settings termDates/templates 保護；
-//   新增評估非課業預設滿分讀 settings.defaultFullMark；模板刪除)
+// CRUD Operations (v16 — 
+//   1) cascade-cleanup globalStudents.records on delete year/class/student
+//   2) editStudentMatchConfirm: re-link / unlink existing students 
+//   3) safe with subject-only academic year record counting
+//   4) ★ NEW v16: auto-match students in subject/elective creation
+//      (regular class no auto-match; subject/elective auto-merge with prev-year same-subject)
 // ================================================================
 const CrudMethods = {
 
@@ -11,7 +15,6 @@ const CrudMethods = {
       this.loadingProgress = 5;
 
       this.loadingText = '正在載入基本資料...';
-      // ★ v20: 第一階段（首屏必載）：settings、globalStudents（全量）、所有學年（含骨架）
       const [settingsSnap, yearsSnap, globalSnap] = await Promise.all([
         db.collection('settings').doc('main').get(),
         db.collection('academicYears').orderBy('createdAt', 'desc').get(),
@@ -23,7 +26,6 @@ const CrudMethods = {
       if (settingsSnap.exists) {
         const d = settingsSnap.data();
         this.settings = { ...this.settings, ...d };
-        // ★ 第六輪：結構保護，避免 v-model 綁定 termDates / templates 時出錯
         if (!this.settings.termDates || typeof this.settings.termDates !== 'object') this.settings.termDates = {};
         if (!Array.isArray(this.settings.templates)) this.settings.templates = [];
         if (d.themeColor) this.currentTheme = d.themeColor;
@@ -33,10 +35,9 @@ const CrudMethods = {
           this.tabOrder = valid;
         }
         if (d.activeQuickNavKeys && Array.isArray(d.activeQuickNavKeys)) this.activeQuickNavKeys = d.activeQuickNavKeys;
-        if (d.lastSelectedYearId) lastSelectedYearId = d.lastSelectedYearId; // ★ v20
+        if (d.lastSelectedYearId) lastSelectedYearId = d.lastSelectedYearId;
       }
 
-      // ★ v20: globalStudents 維持全量（資料量通常小，且連結 / 同名 / 未載入學年人數推導皆依賴它）
       this.globalStudents = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       if (yearsSnap.docs.length === 0) {
@@ -46,7 +47,6 @@ const CrudMethods = {
         return;
       }
 
-      // ★ v20: 第二階段 — 載入所有學年的「班別骨架」（classes 基本資料；不含 students/terms/assessments）
       this.loadingText = '正在載入班別資料...';
       const yearDocs = yearsSnap.docs;
       const classesPerYearPromises = yearDocs.map(yD =>
@@ -56,7 +56,6 @@ const CrudMethods = {
       this.loadingProgress = 45;
 
       const years = yearDocs.map((yD, i) => {
-        // ★ v20: _loaded / _loading 為「學年完整載入」狀態旗標
         const year = { id: yD.id, ...yD.data(), classes: [], _loaded: false, _loading: false };
         const cs = classesPerYearSnaps[i];
         year.classes = cs.docs.map(cD => {
@@ -87,18 +86,15 @@ const CrudMethods = {
 
       this.academicYears = years;
 
-      // ★ v20: 決定「當前學年」：優先上次選取，否則最新（desc 第一筆）
       let initialYearId = (lastSelectedYearId && years.find(y => y.id === lastSelectedYearId))
         ? lastSelectedYearId : years[0].id;
       this.expandedYears = { [initialYearId]: true };
 
-      // ★ v20: 第三階段 — 僅對「當前學年」執行完整載入（students / terms / assessments）
       this.loadingText = '正在載入當前學年詳細資料...';
       this.loadingProgress = 60;
       await this.loadYearData(initialYearId);
       this.loadingProgress = 95;
 
-      // ★ v20: 設定當前學年（跳過此次 lastSelectedYearId 的重複寫入）
       this._skipYearWatchSave = true;
       this.currentAcademicYearId = initialYearId;
 
@@ -112,7 +108,6 @@ const CrudMethods = {
     }
   },
 
-  // ★ v20: 完整載入指定學年（students / terms / assessments）。防重入 + 並發共享 promise。
   loadYearData(yearId) {
     const year = this.academicYears.find(y => y.id === yearId);
     if (!year) return Promise.resolve();
@@ -183,8 +178,6 @@ const CrudMethods = {
 
       year._loaded = true;
 
-      // ★ v20: 若剛載入的正是目前選取中的學年與班別，補跑相依初始化
-      // （避免在骨架狀態下 gradesTermId / scoringWeights 被設成空值）
       if (yearId === this.currentAcademicYearId && this.currentClassId) {
         this.$nextTick(() => {
           this.gradesAutoSelectTerm();
@@ -197,7 +190,6 @@ const CrudMethods = {
     }
   },
 
-  // ★ v20: 確保「單一學年」已完整載入（附 UI 載入狀態）
   async ensureYearLoaded(yearId) {
     const year = this.academicYears.find(y => y.id === yearId);
     if (!year || year._loaded) return;
@@ -208,7 +200,6 @@ const CrudMethods = {
     finally { this.yearLoading = false; }
   },
 
-  // ★ v20: 確保「指定多個學年」已載入（跨學年分析按需只載相關學年）
   async ensureYearsLoaded(yearIds) {
     const ids = [...new Set(yearIds || [])].filter(id => {
       const y = this.academicYears.find(yy => yy.id === id);
@@ -222,7 +213,6 @@ const CrudMethods = {
     finally { this.yearLoading = false; }
   },
 
-  // ★ v20: 確保「所有」學年皆已完整載入（供需要全量資料的功能，例如批次3資料備份匯出）
   async ensureAllYearsLoaded() {
     const unloaded = this.academicYears.filter(y => !y._loaded);
     if (!unloaded.length) return;
@@ -245,7 +235,290 @@ const CrudMethods = {
       (c.classType === 'regular' || c.classType === 'subject'));
   },
 
-  // ★ v13: create (or reuse by name) an assignment category on a class
+  async _cleanupGlobalStudentRecords(matchFn) {
+    const cleanupPromises = [];
+    const removedGsIds = [];
+    for (const gs of this.globalStudents) {
+      const oldRecords = gs.records || [];
+      const newRecords = oldRecords.filter(r => !matchFn(r));
+      if (newRecords.length !== oldRecords.length) {
+        if (newRecords.length === 0) {
+          cleanupPromises.push(
+            db.collection('globalStudents').doc(gs.id).delete().catch(e => {
+              console.error('delete globalStudent failed:', gs.id, e);
+            })
+          );
+          removedGsIds.push(gs.id);
+        } else {
+          gs.records = newRecords;
+          cleanupPromises.push(
+            db.collection('globalStudents').doc(gs.id).update({ records: newRecords }).catch(e => {
+              console.error('update globalStudent records failed:', gs.id, e);
+            })
+          );
+        }
+      }
+    }
+    await Promise.all(cleanupPromises);
+    if (removedGsIds.length > 0) {
+      this.globalStudents = this.globalStudents.filter(gs => !removedGsIds.includes(gs.id));
+    }
+    return removedGsIds.length;
+  },
+
+  // ============================================================
+  // ★ v16 NEW: Auto-match a student in a newly-created subject/elective
+  // class against previous-year same-subject record. If a unique match is
+  // found, MERGE the student's existing globalStudent into the matched 
+  // globalStudent so the same physical student keeps a single global ID 
+  // across all linked classes (regular / subject / elective) and across years.
+  //
+  // Returns: { gid, matched }
+  //   - gid: the final globalStudentId to use for this student
+  //   - matched: true if a match was found and merge performed
+  // ============================================================
+  async _autoMatchStudentInSubject(yearId, classId, studentDocId, studentName, currentGid) {
+    try {
+      const cands = await this._buildStudentMatchCandidates(yearId, classId, studentName);
+      // Only auto-match when there is exactly one candidate (avoid ambiguity)
+      if (!cands || cands.previousYearCandidates.length !== 1) {
+        return { gid: currentGid, matched: false };
+      }
+      const matchedGid = cands.previousYearCandidates[0].globalStudentId;
+      if (!matchedGid || matchedGid === currentGid) {
+        return { gid: currentGid, matched: false };
+      }
+
+      if (currentGid) {
+        // Merge: transfer all records from currentGid into matchedGid
+        const oldGs = this.globalStudents.find(g => g.id === currentGid);
+        const matchedGs = this.globalStudents.find(g => g.id === matchedGid);
+        if (oldGs && matchedGs) {
+          const oldRecords = (oldGs.records || []).slice();
+          const merged = (matchedGs.records || []).slice();
+          for (const r of oldRecords) {
+            if (!merged.find(x => x.academicYearId === r.academicYearId && x.classId === r.classId)) {
+              merged.push(r);
+            }
+          }
+          matchedGs.records = merged;
+          try {
+            await db.collection('globalStudents').doc(matchedGid).update({ records: merged });
+          } catch (e) { console.error('auto-match: merge update matched failed', e); }
+
+          // Update all student docs that reference oldGid → matchedGid
+          const updatePromises = [];
+          for (const r of oldRecords) {
+            const cls = this.getClassObj(r.academicYearId, r.classId);
+            if (!cls) continue;
+            for (const stu of (cls.students || [])) {
+              if (stu.globalStudentId === currentGid) {
+                updatePromises.push(
+                  db.collection('academicYears').doc(r.academicYearId)
+                    .collection('classes').doc(r.classId)
+                    .collection('students').doc(stu.id)
+                    .update({ globalStudentId: matchedGid })
+                    .then(() => { stu.globalStudentId = matchedGid; })
+                    .catch(e => console.error('auto-match: update student gid failed', e))
+                );
+              }
+            }
+          }
+          await Promise.all(updatePromises);
+
+          // Delete the old globalStudent (now empty)
+          try { await db.collection('globalStudents').doc(currentGid).delete(); }
+          catch (e) { console.error('auto-match: delete old gs failed', e); }
+          this.globalStudents = this.globalStudents.filter(g => g.id !== currentGid);
+        }
+      } else {
+        // No existing gid: simply add (yearId, classId) to matched & link this student
+        const matchedGs = this.globalStudents.find(g => g.id === matchedGid);
+        if (matchedGs) {
+          if (!matchedGs.records) matchedGs.records = [];
+          if (!matchedGs.records.find(x => x.academicYearId === yearId && x.classId === classId)) {
+            matchedGs.records.push({ academicYearId: yearId, classId });
+            try { await db.collection('globalStudents').doc(matchedGid).update({ records: matchedGs.records }); }
+            catch (e) { console.error('auto-match: add record failed', e); }
+          }
+        }
+        try {
+          await db.collection('academicYears').doc(yearId).collection('classes').doc(classId)
+            .collection('students').doc(studentDocId).update({ globalStudentId: matchedGid });
+        } catch (e) { console.error('auto-match: update new student gid failed', e); }
+      }
+
+      return { gid: matchedGid, matched: true };
+    } catch (e) {
+      console.error('_autoMatchStudentInSubject failed', e);
+      return { gid: currentGid, matched: false };
+    }
+  },
+
+  // ============================================================
+  // Cross-year student auto-matching helpers (v14)
+  // ============================================================
+
+  _getPreviousAcademicYear(currentYearId) {
+    if (!currentYearId) return null;
+    const idx = this.academicYears.findIndex(y => y.id === currentYearId);
+    if (idx < 0) return null;
+    if (idx >= this.academicYears.length - 1) return null;
+    return this.academicYears[idx + 1];
+  },
+
+  async _buildStudentMatchCandidates(yearId, classId, studentName) {
+    const result = { previousYearCandidates: [], sameNameGlobals: [] };
+    if (!studentName || !studentName.trim()) return result;
+    const name = studentName.trim();
+
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) return result;
+
+    const ct = cls.classType || 'regular';
+    const subjectName = (cls.subject || '').trim();
+
+    if ((ct === 'subject' || ct === 'elective') && subjectName) {
+      const prevYear = this._getPreviousAcademicYear(yearId);
+      if (prevYear) {
+        try { await this.ensureYearLoaded(prevYear.id); } catch (e) { /* swallow */ }
+
+        const prevClasses = (prevYear.classes || []).filter(c =>
+          (c.classType === 'subject' || c.classType === 'elective') &&
+          (c.subject || '').trim() === subjectName
+        );
+
+        const seenGids = new Set();
+
+        for (const pc of prevClasses) {
+          for (const stu of (pc.students || [])) {
+            if ((stu.studentName || '').trim() !== name) continue;
+
+            let gid = stu.globalStudentId || null;
+            let gs = gid ? this.globalStudents.find(g => g.id === gid) : null;
+
+            if (!gs) {
+              gs = this.globalStudents.find(g =>
+                (g.name || '').trim() === name &&
+                (g.records || []).some(r => r.academicYearId === prevYear.id && r.classId === pc.id)
+              );
+              if (gs) gid = gs.id;
+            }
+
+            if (!gs) {
+              try {
+                const newRecords = [{ academicYearId: prevYear.id, classId: pc.id }];
+                const gr = await db.collection('globalStudents').add({ name: name, records: newRecords });
+                gid = gr.id;
+                gs = { id: gid, name: name, records: [...newRecords] };
+                this.globalStudents.push(gs);
+                await db.collection('academicYears').doc(prevYear.id).collection('classes').doc(pc.id)
+                  .collection('students').doc(stu.id).update({ globalStudentId: gid });
+                stu.globalStudentId = gid;
+              } catch (e) {
+                console.error('patch global student failed:', e);
+                continue;
+              }
+            }
+
+            if (gs && !seenGids.has(gs.id)) {
+              seenGids.add(gs.id);
+              result.previousYearCandidates.push({
+                globalStudent: gs,
+                globalStudentId: gs.id,
+                prevYearId: prevYear.id,
+                prevYearName: prevYear.name,
+                prevClassId: pc.id,
+                prevClassName: pc.className,
+                prevSubject: pc.subject || '',
+                prevStudentNumber: stu.studentNumber || '',
+                prevStudentName: stu.studentName || name
+              });
+            }
+          }
+        }
+      }
+    }
+
+    result.sameNameGlobals = this.globalStudents.filter(g => (g.name || '').trim() === name);
+    return result;
+  },
+
+  async prepareStudentAutoMatch() {
+    if (this.modalType !== 'addStudent') return;
+    const name = (this.modalData.studentName || '').trim();
+    if (!name) {
+      this.modalData.matchedGlobal = null;
+      this.modalData.matchCandidates = [];
+      this.modalData.linkToGlobal = false;
+      this.modalData.matchSource = null;
+      this.modalData.selectedGlobalStudentId = null;
+      return;
+    }
+
+    const yearId = this.modalData.yearId || this.currentAcademicYearId;
+    const classId = this.modalData.classId || this.currentClassId;
+    if (!yearId || !classId) return;
+
+    let cands;
+    try {
+      cands = await this._buildStudentMatchCandidates(yearId, classId, name);
+    } catch (e) {
+      console.error('prepareStudentAutoMatch failed', e);
+      return;
+    }
+
+    if (this.modalType !== 'addStudent') return;
+    if ((this.modalData.studentName || '').trim() !== name) return;
+
+    if (cands.previousYearCandidates.length === 1) {
+      const c = cands.previousYearCandidates[0];
+      this.modalData.matchedGlobal = c.globalStudent;
+      this.modalData.matchCandidates = cands.previousYearCandidates;
+      this.modalData.linkToGlobal = true;
+      this.modalData.matchSource = 'previousYearSameSubject';
+      this.modalData.selectedGlobalStudentId = c.globalStudentId;
+    } else if (cands.previousYearCandidates.length > 1) {
+      this.modalData.matchedGlobal = null;
+      this.modalData.matchCandidates = cands.previousYearCandidates;
+      this.modalData.linkToGlobal = false;
+      this.modalData.matchSource = 'multipleCandidates';
+      this.modalData.selectedGlobalStudentId = null;
+    } else if (cands.sameNameGlobals.length > 0) {
+      this.modalData.matchedGlobal = cands.sameNameGlobals[0];
+      this.modalData.matchCandidates = [];
+      this.modalData.linkToGlobal = false;
+      this.modalData.matchSource = 'sameNameGlobal';
+      this.modalData.selectedGlobalStudentId = null;
+    } else {
+      this.modalData.matchedGlobal = null;
+      this.modalData.matchCandidates = [];
+      this.modalData.linkToGlobal = false;
+      this.modalData.matchSource = null;
+      this.modalData.selectedGlobalStudentId = null;
+    }
+  },
+
+  onMatchCandidateChange(gid) {
+    if (!gid) {
+      this.modalData.selectedGlobalStudentId = null;
+      this.modalData.matchedGlobal = null;
+      this.modalData.linkToGlobal = false;
+      if (this.modalData.matchSource !== 'multipleCandidates' && this.modalData.matchSource !== 'manual') {
+        this.modalData.matchSource = 'multipleCandidates';
+      }
+      return;
+    }
+    const c = (this.modalData.matchCandidates || []).find(c => c.globalStudentId === gid);
+    if (!c) return;
+    this.modalData.selectedGlobalStudentId = gid;
+    this.modalData.matchedGlobal = c.globalStudent;
+    this.modalData.linkToGlobal = true;
+    this.modalData.matchSource = 'manual';
+  },
+
+  // ============================================================
+
   async _ensureAssignmentCategory(yearId, classId, name) {
     const cls = this.getClassObj(yearId, classId);
     if (!cls) return null;
@@ -266,7 +539,6 @@ const CrudMethods = {
     const name = (this.modalData.name || '').trim();
     if (!name) { this.addToast('請輸入學年名稱', 'warning'); return; }
     const dr = await db.collection('academicYears').add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    // ★ v20: 新建空學年無需懶載入 → 直接標記為已載入
     this.academicYears.unshift({ id: dr.id, name, createdAt: new Date(), classes: [], _loaded: true, _loading: false });
     this.expandedYears = { ...this.expandedYears, [dr.id]: true };
     this.closeModal(); this.addToast('學年「' + name + '」已建立', 'success');
@@ -284,7 +556,6 @@ const CrudMethods = {
 
   async deleteAcademicYear(yearId) {
     const year = this.academicYears.find(y => y.id === yearId); if (!year) return;
-    // ★ v20: 刪除前確保該學年已完整載入，避免漏刪未載入的 students / assessments
     await this.ensureYearLoaded(yearId);
     const deletionPromises = [];
     for (const cls of year.classes) {
@@ -299,10 +570,16 @@ const CrudMethods = {
       await db.collection('academicYears').doc(yearId).collection('classes').doc(cls.id).delete();
     }
     await db.collection('academicYears').doc(yearId).delete();
+
+    const removedGs = await this._cleanupGlobalStudentRecords(r => r.academicYearId === yearId);
+
     this.academicYears = this.academicYears.filter(y => y.id !== yearId);
     if (this.currentAcademicYearId === yearId) { this.currentAcademicYearId = null; this.currentClassId = null; }
     if (this.settingsCurrentYearId === yearId) { const idx = this.settingsNav.findIndex(n => n.yearId === yearId); if (idx >= 0) this.settingsNav = this.settingsNav.slice(0, idx); }
-    this.addToast('學年已刪除', 'success');
+
+    let msg = '學年已刪除';
+    if (removedGs > 0) msg += `（同步清理 ${removedGs} 位學生的全域記錄）`;
+    this.addToast(msg, 'success');
   },
 
   async addClass() {
@@ -419,12 +696,27 @@ const CrudMethods = {
       }
     }
 
+    // ★ v16: Auto-match students for elective classes (not for regular classes)
+    let autoMatchedCount = 0;
+    if (type === 'elective' && nc.students.length > 0) {
+      for (const stu of nc.students) {
+        const r = await this._autoMatchStudentInSubject(yearId, nc.id, stu.id, stu.studentName, stu.globalStudentId);
+        if (r.matched) {
+          stu.globalStudentId = r.gid;
+          autoMatchedCount++;
+        }
+      }
+    }
+
     this.closeModal();
     let typeLabel = type === 'elective' ? '選修科' : '班別';
     const displayName = className.trim() + (subjectName ? ' - ' + subjectName : '');
     let msg = typeLabel + '「' + displayName + '」已建立';
     if (initialStudents.length > 0) {
       msg += ',已同步 ' + initialStudents.length + ' 位學生';
+    }
+    if (autoMatchedCount > 0) {
+      msg += '，自動匹配 ' + autoMatchedCount + ' 位學生跨學年記錄';
     }
     this.addToast(msg, 'success');
   },
@@ -456,6 +748,7 @@ const CrudMethods = {
 
     let createdCount = 0;
     let totalStudents = 0;
+    let totalAutoMatched = 0;
     for (const classId of selectedClassIds) {
       const baseClass = year.classes.find(c => c.id === classId);
       if (!baseClass) continue;
@@ -527,12 +820,26 @@ const CrudMethods = {
           }
           totalStudents++;
         }
+
+        // ★ v16: Auto-match each student in this newly-created subject class
+        // against previous year same-subject record (ensures cross-year analysis works)
+        for (const stu of nc.students) {
+          const r = await this._autoMatchStudentInSubject(yearId, nc.id, stu.id, stu.studentName, stu.globalStudentId);
+          if (r.matched) {
+            stu.globalStudentId = r.gid;
+            totalAutoMatched++;
+          }
+        }
       }
       createdCount++;
     }
 
     this.closeModal();
-    this.addToast('已新增科目「' + subjectName + '」至 ' + createdCount + ' 個班別(共同步 ' + totalStudents + ' 位學生)', 'success');
+    let msg = '已新增科目「' + subjectName + '」至 ' + createdCount + ' 個班別(共同步 ' + totalStudents + ' 位學生)';
+    if (totalAutoMatched > 0) {
+      msg += '，自動匹配 ' + totalAutoMatched + ' 位學生跨學年記錄';
+    }
+    this.addToast(msg, 'success');
   },
 
   async updateClass() {
@@ -600,7 +907,6 @@ const CrudMethods = {
     const year = this.academicYears.find(y => y.id === yearId);
     const cls = year?.classes.find(c => c.id === classId);
     if (!cls) return;
-    // ★ v20: 確保學年完整載入再刪除（避免漏刪 students / assessments）
     await this.ensureYearLoaded(yearId);
 
     const targets = [cls];
@@ -635,6 +941,11 @@ const CrudMethods = {
     await Promise.all(targets.map(t => db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).delete()));
 
     const deletedIds = targets.map(t => t.id);
+
+    const removedGs = await this._cleanupGlobalStudentRecords(r =>
+      r.academicYearId === yearId && deletedIds.includes(r.classId)
+    );
+
     year.classes = year.classes.filter(c => !deletedIds.includes(c.id));
 
     if (this.currentClassId && deletedIds.includes(this.currentClassId)) this.currentClassId = null;
@@ -643,14 +954,15 @@ const CrudMethods = {
       if (idx >= 0) this.settingsNav = this.settingsNav.slice(0, idx);
     }
 
-    const msg = targets.length > 1
+    let msg = targets.length > 1
       ? '已刪除班別及其 ' + (targets.length - 1) + ' 個科目'
       : '已刪除';
+    if (removedGs > 0) msg += `（同步清理 ${removedGs} 位學生的全域記錄）`;
     this.addToast(msg, 'success');
   },
 
   async addStudent() {
-    const { studentNumber, studentName, linkToGlobal, matchedGlobal } = this.modalData;
+    const { studentNumber, studentName, linkToGlobal, matchedGlobal, selectedGlobalStudentId } = this.modalData;
     if (!studentNumber.trim() || !studentName.trim()) { this.addToast('請填寫學號和姓名', 'warning'); return; }
     const yearId = this.modalData.yearId || this.currentAcademicYearId;
     const classId = this.modalData.classId || this.currentClassId;
@@ -667,13 +979,33 @@ const CrudMethods = {
       }
     }
 
+    const linkGid = linkToGlobal
+      ? (selectedGlobalStudentId || (matchedGlobal && matchedGlobal.id) || null)
+      : null;
+
     let gid = null;
     const recordsToAdd = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
-    if (linkToGlobal && matchedGlobal) {
-      gid = matchedGlobal.id;
-      await db.collection('globalStudents').doc(matchedGlobal.id).update({
-        records: firebase.firestore.FieldValue.arrayUnion(...recordsToAdd)
-      });
+
+    if (linkGid) {
+      gid = linkGid;
+      try {
+        await db.collection('globalStudents').doc(gid).update({
+          records: firebase.firestore.FieldValue.arrayUnion(...recordsToAdd)
+        });
+      } catch (e) {
+        console.error('arrayUnion failed, fallback to local merge', e);
+      }
+      let gs = this.globalStudents.find(g => g.id === gid);
+      if (!gs) {
+        gs = { id: gid, name: studentName.trim(), records: [] };
+        this.globalStudents.push(gs);
+      }
+      if (!gs.records) gs.records = [];
+      for (const r of recordsToAdd) {
+        if (!gs.records.find(x => x.academicYearId === r.academicYearId && x.classId === r.classId)) {
+          gs.records.push(r);
+        }
+      }
     } else {
       const gr = await db.collection('globalStudents').add({ name: studentName.trim(), records: recordsToAdd });
       gid = gr.id;
@@ -692,9 +1024,18 @@ const CrudMethods = {
     }
 
     this.closeModal();
-    const msg = targets.length > 1
-      ? '學生「' + studentName.trim() + '」已新增(同步至 ' + targets.length + ' 個連結班別)'
-      : '學生「' + studentName.trim() + '」已新增';
+    let msg;
+    if (linkGid) {
+      const linkedHint = (this.modalData.matchSource === 'previousYearSameSubject')
+        ? '已自動連結上一學年同科目記錄' : '已連結跨學年記錄';
+      msg = targets.length > 1
+        ? '學生「' + studentName.trim() + '」已新增（' + linkedHint + '，同步至 ' + targets.length + ' 個班別）'
+        : '學生「' + studentName.trim() + '」已新增（' + linkedHint + '）';
+    } else {
+      msg = targets.length > 1
+        ? '學生「' + studentName.trim() + '」已新增(同步至 ' + targets.length + ' 個連結班別)'
+        : '學生「' + studentName.trim() + '」已新增';
+    }
     this.addToast(msg, 'success');
   },
 
@@ -778,6 +1119,24 @@ const CrudMethods = {
     for (const { t, sid } of localRemovals) {
       t.students = t.students.filter(s => s.id !== sid);
     }
+
+    if (gid) {
+      const targetClassIds = targets.map(t => t.id);
+      const gs = this.globalStudents.find(g => g.id === gid);
+      if (gs) {
+        const oldLen = (gs.records || []).length;
+        gs.records = (gs.records || []).filter(r =>
+          !(r.academicYearId === yearId && targetClassIds.includes(r.classId))
+        );
+        if (gs.records.length === 0) {
+          try { await db.collection('globalStudents').doc(gid).delete(); } catch (e) { console.error(e); }
+          this.globalStudents = this.globalStudents.filter(g => g.id !== gid);
+        } else if (gs.records.length !== oldLen) {
+          try { await db.collection('globalStudents').doc(gid).update({ records: gs.records }); } catch (e) { console.error(e); }
+        }
+      }
+    }
+
     const msg = count > 1 ? '學生已從 ' + count + ' 個連結班別中刪除' : '學生已刪除';
     this.addToast(msg, 'success');
   },
@@ -811,26 +1170,64 @@ const CrudMethods = {
       students.push({ studentNumber: num, studentName: name });
     }
 
+    let autoMatchCount = 0;
+    let multiCandidateCount = 0;
+    const studentsWithMatch = [];
+    for (const s of students) {
+      let autoGid = null;
+      try {
+        const cands = await this._buildStudentMatchCandidates(yearId, classId, s.studentName);
+        if (cands.previousYearCandidates.length === 1) {
+          autoGid = cands.previousYearCandidates[0].globalStudentId;
+          autoMatchCount++;
+        } else if (cands.previousYearCandidates.length > 1) {
+          multiCandidateCount++;
+        }
+      } catch (e) { console.error('batch match failed', e); }
+      studentsWithMatch.push({ ...s, autoGid });
+    }
+
     const recordsForAll = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
     const allPromises = [];
-    const globalStudentResults = [];
-    for (const s of students) {
-      const p = db.collection('globalStudents').add({ name: s.studentName, records: recordsForAll })
-        .then(gr => {
-          globalStudentResults.push({ gr, s });
+
+    for (const s of studentsWithMatch) {
+      let p;
+      if (s.autoGid) {
+        p = db.collection('globalStudents').doc(s.autoGid).update({
+          records: firebase.firestore.FieldValue.arrayUnion(...recordsForAll)
+        }).then(() => {
+          const gs = this.globalStudents.find(g => g.id === s.autoGid);
+          if (gs) {
+            if (!gs.records) gs.records = [];
+            for (const r of recordsForAll) {
+              if (!gs.records.find(x => x.academicYearId === r.academicYearId && x.classId === r.classId)) {
+                gs.records.push(r);
+              }
+            }
+          }
           return Promise.all(targets.map(t =>
             db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
-              studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id,
+              studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: s.autoGid,
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(dr => ({ dr, t, s, gid: gr.id }))
+            }).then(dr => ({ dr, t, s, gid: s.autoGid }))
           ));
         });
+      } else {
+        p = db.collection('globalStudents').add({ name: s.studentName, records: recordsForAll })
+          .then(gr => {
+            this.globalStudents.push({ id: gr.id, name: s.studentName, records: [...recordsForAll] });
+            return Promise.all(targets.map(t =>
+              db.collection('academicYears').doc(yearId).collection('classes').doc(t.id).collection('students').add({
+                studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gr.id,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              }).then(dr => ({ dr, t, s, gid: gr.id }))
+            ));
+          });
+      }
       allPromises.push(p);
     }
+
     const allResults = await Promise.all(allPromises);
-    for (const { gr, s } of globalStudentResults) {
-      this.globalStudents.push({ id: gr.id, name: s.studentName, records: [...recordsForAll] });
-    }
     for (const resultArr of allResults) {
       for (const { dr, t, s, gid } of resultArr) {
         t.students.push({ id: dr.id, studentNumber: s.studentNumber, studentName: s.studentName, globalStudentId: gid });
@@ -838,13 +1235,106 @@ const CrudMethods = {
     }
 
     this.closeModal();
-    const msg = targets.length > 1
+    let msg = targets.length > 1
       ? '已匯入 ' + students.length + ' 位學生至 ' + targets.length + ' 個連結班別'
       : '已匯入 ' + students.length + ' 位學生';
+    if (autoMatchCount > 0) msg += '，已自動匹配 ' + autoMatchCount + ' 位學生';
+    if (multiCandidateCount > 0) msg += '，有 ' + multiCandidateCount + ' 位學生找到多個可能匹配，已略過自動連結';
     this.addToast(msg, 'success');
   },
 
-  // ★ 第六輪：name default blank（teacher input）；課業預設 10，其他類型讀 settings.defaultFullMark
+  async editStudentMatchConfirm() {
+    const { studentId, studentName, yearId, classId, currentGlobalStudentId, selectedAction } = this.modalData;
+
+    if (!selectedAction || selectedAction === 'keep') {
+      this.closeModal();
+      return;
+    }
+
+    const cls = this.getClassObj(yearId, classId);
+    if (!cls) { this.addToast('找不到班別', 'error'); return; }
+    const targets = this._getLinkedClasses(yearId, cls);
+    const targetClassIds = targets.map(t => t.id);
+
+    let newGid = null;
+    if (selectedAction === 'unlink') {
+      const recordsToAdd = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
+      const gr = await db.collection('globalStudents').add({
+        name: studentName,
+        records: recordsToAdd
+      });
+      newGid = gr.id;
+      this.globalStudents.push({ id: gr.id, name: studentName, records: [...recordsToAdd] });
+    } else if (typeof selectedAction === 'string' && selectedAction.indexOf('link:') === 0) {
+      newGid = selectedAction.substring(5);
+    } else {
+      this.closeModal();
+      return;
+    }
+
+    if (!newGid || newGid === currentGlobalStudentId) {
+      this.closeModal();
+      return;
+    }
+
+    if (currentGlobalStudentId && currentGlobalStudentId !== newGid) {
+      const oldGs = this.globalStudents.find(g => g.id === currentGlobalStudentId);
+      if (oldGs) {
+        const newRecords = (oldGs.records || []).filter(r =>
+          !(r.academicYearId === yearId && targetClassIds.includes(r.classId))
+        );
+        if (newRecords.length === 0) {
+          try { await db.collection('globalStudents').doc(currentGlobalStudentId).delete(); }
+          catch (e) { console.error('delete old global student failed', e); }
+          this.globalStudents = this.globalStudents.filter(g => g.id !== currentGlobalStudentId);
+        } else {
+          oldGs.records = newRecords;
+          try { await db.collection('globalStudents').doc(currentGlobalStudentId).update({ records: newRecords }); }
+          catch (e) { console.error('update old global student failed', e); }
+        }
+      }
+    }
+
+    if (typeof selectedAction === 'string' && selectedAction.indexOf('link:') === 0) {
+      const recordsToAdd = targets.map(t => ({ academicYearId: yearId, classId: t.id }));
+      try {
+        await db.collection('globalStudents').doc(newGid).update({
+          records: firebase.firestore.FieldValue.arrayUnion(...recordsToAdd)
+        });
+      } catch (e) {
+        console.error('arrayUnion failed', e);
+      }
+      const newGs = this.globalStudents.find(g => g.id === newGid);
+      if (newGs) {
+        if (!newGs.records) newGs.records = [];
+        for (const r of recordsToAdd) {
+          if (!newGs.records.find(x => x.academicYearId === r.academicYearId && x.classId === r.classId)) {
+            newGs.records.push(r);
+          }
+        }
+      }
+    }
+
+    const updatePromises = [];
+    for (const t of targets) {
+      let stuInTarget;
+      if (t.id === classId) stuInTarget = t.students.find(s => s.id === studentId);
+      else if (currentGlobalStudentId) stuInTarget = t.students.find(s => s.globalStudentId === currentGlobalStudentId);
+      else stuInTarget = null;
+      if (!stuInTarget) continue;
+      updatePromises.push(
+        db.collection('academicYears').doc(yearId).collection('classes').doc(t.id)
+          .collection('students').doc(stuInTarget.id).update({ globalStudentId: newGid })
+      );
+      stuInTarget.globalStudentId = newGid;
+    }
+    await Promise.all(updatePromises);
+
+    this.closeModal();
+    if (selectedAction === 'unlink') this.addToast('已取消連結，學生已成為獨立記錄', 'success');
+    else this.addToast('已重新連結匹配對象', 'success');
+  },
+
   openAddAssessmentModal(type, period, customCategoryId) {
     if (!this.gradesTerm) return;
     this.openModal('addAssessment', {
@@ -871,7 +1361,6 @@ const CrudMethods = {
     const term = cls?.terms?.find(t => t.id === termId);
     if (!term) { this.addToast('找不到學期', 'error'); return; }
 
-    // ★ v11: name can be blank → auto-generate
     let aName = (this.modalData.name || '').trim();
     if (!aName) {
       const all = term.assessments || [];
@@ -922,7 +1411,6 @@ const CrudMethods = {
       }
     }
 
-    // ★ v13: resolve assignment category (supports inline-created category)
     let asgCatId = null;
     if (type === 'assignment') {
       asgCatId = this.modalData.assignmentCategoryId || null;
@@ -1024,7 +1512,6 @@ const CrudMethods = {
     a.date = date || null;
     a.notes = (notes || '').trim();
 
-    // ★ v13: assignment category update
     if (a.type === 'assignment') {
       let asgCatId = this.modalData.assignmentCategoryId || null;
       if (asgCatId === '__new__') {
@@ -1122,7 +1609,6 @@ const CrudMethods = {
       scores: a.scores || {}
     };
 
-    // ★ v13: persist assignment category
     if (a.type === 'assignment') {
       if (a.assignmentCategoryId) updateData.assignmentCategoryId = a.assignmentCategoryId;
       else updateData.assignmentCategoryId = firebase.firestore.FieldValue.delete();
@@ -1247,7 +1733,7 @@ const CrudMethods = {
       case 'student': await this.deleteStudent(yearId, classId, id); break;
       case 'assessment': await this.deleteAssessmentDoc(yearId, classId, this.modalData.termId, id); break;
       case 'customCategory': await this.deleteCustomCategory(yearId, classId, id); break;
-      case 'template': await this.deleteTemplate(id); break; // ★ 第六輪
+      case 'template': await this.deleteTemplate(id); break;
     }
     this.closeModal();
   }
