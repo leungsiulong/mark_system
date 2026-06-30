@@ -314,6 +314,334 @@
       box-shadow:0 0 0 3px var(--focus-ring),0 6px 14px rgba(var(--theme-primary-rgb),0.28)!important;
     }
     .theme-preview-card .theme-swatch{width:1.75rem;height:1.75rem;border-radius:0.5rem;box-shadow:0 2px 6px rgba(15,23,42,0.18)}
+
+    /* =========================================================
+       ★ v27: Profile 登入閘（重新設計）
+       - 移除白色卡片底，改為沉穩深色「書院」風格，降低 AI 既視感
+       - 帳戶選擇採頭像直接浮於深色背景（類 Netflix 選人），無白卡
+       - 統一以暖金（brass）作點綴色，取代原紫藍漸層
+       ========================================================= */
+    .profile-gate{
+      position:fixed;inset:0;z-index:50;
+      display:flex;align-items:center;justify-content:center;
+      padding:1.5rem 1rem;overflow:auto;
+      background:#0e1318;
+      font-family:'Microsoft JhengHei','Segoe UI',sans-serif;
+    }
+    .profile-gate-bg{
+      position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 55% 50% at 16% 10%, rgba(45,74,71,0.5), transparent 62%),
+        radial-gradient(ellipse 50% 55% at 88% 90%, rgba(74,60,44,0.45), transparent 62%),
+        linear-gradient(165deg,#0c1116 0%,#131c23 52%,#0e141a 100%);
+    }
+    /* 細緻網格紋理，提供「材質感」而非純漸層的 AI 觀感 */
+    .profile-gate-bg::after{
+      content:'';position:absolute;inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);
+      background-size:46px 46px;
+      -webkit-mask-image:radial-gradient(circle at 50% 42%,#000 0%,transparent 76%);
+      mask-image:radial-gradient(circle at 50% 42%,#000 0%,transparent 76%);
+    }
+    .profile-gate-inner{position:relative;width:100%;max-width:52rem}
+
+    /* Logo + 標題 */
+    .profile-gate-logo{
+      width:4.75rem;height:4.75rem;border-radius:9999px;
+      background:radial-gradient(circle at 32% 28%,#1f2c33,#121a20);
+      border:1px solid rgba(201,166,107,0.55);
+      display:flex;align-items:center;justify-content:center;
+      font-size:2rem;color:#d8b878;
+      box-shadow:0 14px 38px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .profile-gate-title{
+      font-size:2rem;font-weight:700;letter-spacing:0.16em;
+      color:#f0ece1;margin:0;
+    }
+    @media(min-width:640px){.profile-gate-title{font-size:2.4rem}}
+    .profile-gate-divider{
+      width:3.5rem;height:2px;margin:0.9rem auto 0;
+      background:linear-gradient(90deg,transparent,rgba(201,166,107,0.85),transparent);
+    }
+    .profile-gate-subtitle{color:rgba(214,221,224,0.6);margin-top:0.9rem;font-size:0.95rem;letter-spacing:0.04em}
+
+    /* 帳戶選擇（無卡片，直接浮於背景） */
+    .profile-pick{
+      display:flex;flex-direction:column;align-items:center;gap:0.7rem;
+      padding:1.1rem 0.5rem;border-radius:1.1rem;
+      border:1px solid transparent;background:transparent;cursor:pointer;
+      transition:transform .25s ease,background .25s ease,border-color .25s ease;
+    }
+    .profile-pick:hover{background:rgba(255,255,255,0.045);border-color:rgba(201,166,107,0.3);transform:translateY(-5px)}
+    .profile-pick:active{transform:translateY(-1px) scale(.98)}
+
+    .profile-avatar{
+      position:relative;width:4.5rem;height:4.5rem;border-radius:9999px;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:1.6rem;font-weight:700;letter-spacing:.02em;
+      box-shadow:0 10px 28px rgba(0,0,0,0.45);
+      transition:transform .25s ease,box-shadow .25s ease;
+    }
+    .profile-avatar::after{content:'';position:absolute;inset:-3px;border-radius:9999px;border:1px solid rgba(255,255,255,0.12)}
+    .profile-pick:hover .profile-avatar{transform:scale(1.06);box-shadow:0 16px 38px rgba(0,0,0,0.55),0 0 0 3px rgba(201,166,107,0.4)}
+    .profile-avatar-lg{width:5rem;height:5rem;border-radius:9999px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:2rem;font-weight:700;box-shadow:0 12px 30px rgba(0,0,0,0.45)}
+
+    /* 以下 -md / -sm 供登入後的頂部選單與帳戶管理使用（淺色背景），維持原樣 */
+    .profile-avatar-md{width:3rem;height:3rem;border-radius:9999px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.15rem;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,0.16);flex:none}
+    .profile-avatar-sm{width:2rem;height:2rem;border-radius:9999px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.82rem;font-weight:800;flex:none;box-shadow:0 2px 6px rgba(0,0,0,0.18)}
+
+    .profile-admin-badge{
+      position:absolute;top:-3px;right:-3px;
+      width:1.35rem;height:1.35rem;border-radius:9999px;
+      background:linear-gradient(135deg,#e6c478,#cda14e);
+      display:flex;align-items:center;justify-content:center;
+      color:#3a2a08;font-size:.62rem;border:2px solid #131c23;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    }
+    .profile-pick-name{font-weight:600;color:#e7e2d6;font-size:.95rem;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .profile-pick-status{font-size:.72rem;font-weight:500}
+
+    /* 深色磨砂卡片（密碼輸入 / 設定 / 建立管理員） */
+    .profile-glass-card{
+      background:rgba(20,28,35,0.78);
+      backdrop-filter:blur(22px);
+      -webkit-backdrop-filter:blur(22px);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:1.25rem;
+      box-shadow:0 28px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
+      padding:1.75rem;
+    }
+    @media(min-width:640px){.profile-glass-card{padding:2.25rem}}
+    .profile-glass-card-sm{max-width:25rem;margin-left:auto;margin-right:auto}
+
+    /* 深色卡片內的標籤 / 輸入框 / 按鈕 */
+    .profile-label{display:block;color:rgba(214,221,224,0.72);font-size:.85rem;font-weight:500;margin-bottom:0.4rem}
+    .profile-input{
+      width:100%;border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.04);color:#f0ece1;
+      border-radius:0.85rem;padding:0.8rem 0.85rem 0.8rem 2.5rem;
+      font-size:0.9rem;outline:none;transition:border-color .15s,background .15s;
+    }
+    .profile-input::placeholder{color:rgba(214,221,224,0.4)}
+    .profile-input:focus{border-color:rgba(201,166,107,0.65)!important;background:rgba(255,255,255,0.06);box-shadow:0 0 0 3px rgba(201,166,107,0.14)!important}
+
+    .profile-btn-primary{
+      width:100%;border-radius:0.85rem;padding:0.85rem;font-weight:600;font-size:0.95rem;
+      color:#1a140a;background:linear-gradient(135deg,#dcb878,#c79a55);border:none;cursor:pointer;
+      box-shadow:0 10px 26px rgba(201,166,107,0.3);transition:filter .15s,transform .1s;
+    }
+    .profile-btn-primary:hover{filter:brightness(1.06)}
+    .profile-btn-primary:active{transform:scale(.99)}
+    .profile-btn-primary:disabled{opacity:.6;cursor:not-allowed}
+    .profile-btn-back{width:100%;text-align:center;font-size:.85rem;margin-top:1rem;color:rgba(214,221,224,0.5);background:none;border:none;cursor:pointer;transition:color .15s}
+    .profile-btn-back:hover{color:rgba(214,221,224,0.85)}
+
+    .profile-color-swatch{width:2rem;height:2rem;border-radius:9999px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.7rem;cursor:pointer;transition:transform .15s}
+    .profile-color-swatch:hover{transform:scale(1.12)}
+    .profile-color-swatch.active{border-color:#e6c478;box-shadow:0 0 0 3px rgba(201,166,107,0.25)}
+
+    .profile-gate-crown{
+      width:4.75rem;height:4.75rem;border-radius:9999px;
+      background:radial-gradient(circle at 32% 28%,#3a2f1c,#241b10);
+      border:1px solid rgba(212,160,40,0.6);
+      display:flex;align-items:center;justify-content:center;color:#e6b948;font-size:1.9rem;
+      box-shadow:0 14px 36px rgba(0,0,0,0.5);
+    }
+    .profile-gate-footer{color:rgba(214,221,224,0.4);font-size:.78rem;letter-spacing:.04em}
+    .auth-step-enter-active,.auth-step-leave-active{transition:all .3s cubic-bezier(0.4,0,0.2,1)}
+    .auth-step-enter-from{opacity:0;transform:translateY(14px) scale(.98)}
+    .auth-step-leave-to{opacity:0;transform:translateY(-14px) scale(.98)}
+
+    /* =========================================================
+       ★ v28: 深色模式（沿用登入閘的書院風深色調；主題色仍可自訂）
+       - 透過 JS 於 <html> 加上 .app-dark 切換
+       - 以類別覆寫常用 Tailwind utilities，達致全站一致深色介面
+       ========================================================= */
+    .app-dark{color-scheme:dark;}
+    .app-dark body{
+      background:
+        radial-gradient(circle at 0% 0%, rgba(var(--theme-primary-rgb),0.20), transparent 30rem),
+        radial-gradient(circle at 100% 0%, rgba(var(--theme-accent-rgb),0.16), transparent 32rem),
+        radial-gradient(circle at 50% 100%, rgba(var(--theme-secondary-rgb),0.12), transparent 34rem),
+        linear-gradient(165deg,#0c1116 0%,#121a20 55%,#0e141a 100%);
+      color:#e7e2d6;
+    }
+    .app-dark .app-main{
+      background:
+        radial-gradient(circle at 12% 0%, rgba(var(--theme-primary-rgb),0.10), transparent 26rem),
+        radial-gradient(circle at 100% 6%, rgba(var(--theme-accent-rgb),0.09), transparent 28rem),
+        transparent;
+    }
+
+    /* 表面背景 */
+    .app-dark .bg-white{background-color:#18222a !important;}
+    .app-dark .bg-gray-50{background-color:#141d24 !important;}
+    .app-dark .bg-gray-100{background-color:#1f2933 !important;}
+    .app-dark .bg-gray-50\/60{background-color:rgba(20,29,36,0.6) !important;}
+    .app-dark .bg-gray-50\/50{background-color:rgba(20,29,36,0.5) !important;}
+    .app-dark .hover\:bg-gray-50\/50:hover{background-color:rgba(31,41,51,0.5) !important;}
+
+    /* 文字色 */
+    .app-dark .text-gray-800{color:#f0ece1 !important;}
+    .app-dark .text-gray-700{color:#dde3e8 !important;}
+    .app-dark .text-gray-600{color:#bcc5cc !important;}
+    .app-dark .text-gray-500{color:#9aa5ad !important;}
+    .app-dark .text-gray-400{color:#76828b !important;}
+    .app-dark .text-gray-300{color:#5b656d !important;}
+
+    /* 邊框 */
+    .app-dark .border,.app-dark .border-t,.app-dark .border-b,
+    .app-dark .border-l,.app-dark .border-r,
+    .app-dark .border-t-2,.app-dark .border-b-2{border-color:rgba(255,255,255,0.09) !important;}
+    .app-dark .border-gray-100,.app-dark .border-gray-200,.app-dark .border-gray-300{border-color:rgba(255,255,255,0.10) !important;}
+    .app-dark .divide-y>*+*{border-color:rgba(255,255,255,0.09) !important;}
+
+    /* 陰影 / glass */
+    .app-dark .shadow,.app-dark .shadow-sm,.app-dark .shadow-md,
+    .app-dark .shadow-lg,.app-dark .shadow-xl,.app-dark .shadow-2xl{box-shadow:0 16px 44px rgba(0,0,0,0.5) !important;}
+    .app-dark .glass-card{
+      background:rgba(24,34,42,0.86) !important;
+      border-color:rgba(255,255,255,0.08) !important;
+      box-shadow:0 24px 60px rgba(0,0,0,0.5) !important;
+    }
+
+    /* 導覽列 / 側欄 */
+    .app-dark .app-nav{background-color:#141d24 !important;border-bottom-color:rgba(255,255,255,0.08) !important;}
+    .app-dark .app-nav button:hover{background:rgba(var(--theme-primary-rgb),0.18) !important;}
+    .app-dark aside{background-color:#141d24 !important;border-color:rgba(255,255,255,0.08) !important;}
+    .app-dark aside .bg-gray-50{background-color:#10181e !important;}
+
+    /* hover */
+    .app-dark .hover\:bg-gray-50:hover{background-color:#1f2933 !important;}
+    .app-dark .hover\:bg-gray-100:hover{background-color:#26323d !important;}
+    .app-dark .hover\:bg-gray-200:hover{background-color:#2c3a45 !important;}
+    .app-dark .hover\:bg-white:hover{background-color:#1f2933 !important;}
+
+    /* 輸入框 */
+    .app-dark input,.app-dark select,.app-dark textarea{
+      background-color:#10181e !important;
+      border-color:rgba(255,255,255,0.12) !important;
+      color:#f0ece1 !important;
+    }
+    .app-dark input::placeholder,.app-dark textarea::placeholder{color:rgba(214,221,224,0.4) !important;}
+    .app-dark select option{background:#18222a;color:#f0ece1;}
+
+    /* 表格表頭 */
+    .app-dark thead.bg-gray-50,.app-dark thead .bg-gray-50{background-color:#1c262e !important;}
+
+    /* 彩色提示底（50 系，改為深色透明疊加） */
+    .app-dark .bg-blue-50{background-color:rgba(59,130,246,0.13) !important;}
+    .app-dark .bg-green-50{background-color:rgba(16,185,129,0.13) !important;}
+    .app-dark .bg-red-50{background-color:rgba(239,68,68,0.13) !important;}
+    .app-dark .bg-amber-50,.app-dark .bg-yellow-50{background-color:rgba(245,158,11,0.13) !important;}
+    .app-dark .bg-purple-50{background-color:rgba(139,92,246,0.13) !important;}
+    .app-dark .bg-indigo-50{background-color:rgba(99,102,241,0.13) !important;}
+    .app-dark .bg-pink-50{background-color:rgba(236,72,153,0.13) !important;}
+    .app-dark .bg-orange-50{background-color:rgba(249,115,22,0.13) !important;}
+    .app-dark .bg-cyan-50{background-color:rgba(8,145,178,0.13) !important;}
+    .app-dark .bg-teal-50{background-color:rgba(20,184,166,0.13) !important;}
+
+    /* 彩色 100 系（小徽章 / 表頭） */
+    .app-dark .bg-blue-100{background-color:rgba(59,130,246,0.22) !important;}
+    .app-dark .bg-green-100{background-color:rgba(16,185,129,0.22) !important;}
+    .app-dark .bg-red-100{background-color:rgba(239,68,68,0.22) !important;}
+    .app-dark .bg-amber-100{background-color:rgba(245,158,11,0.22) !important;}
+    .app-dark .bg-purple-100{background-color:rgba(139,92,246,0.22) !important;}
+    .app-dark .bg-indigo-100{background-color:rgba(99,102,241,0.22) !important;}
+    .app-dark .bg-teal-100{background-color:rgba(20,184,166,0.22) !important;}
+
+    /* 彩色文字提亮（在深色底維持可讀） */
+    .app-dark .text-blue-500,.app-dark .text-blue-600,.app-dark .text-blue-700,.app-dark .text-blue-800{color:#93c5fd !important;}
+    .app-dark .text-green-500,.app-dark .text-green-600,.app-dark .text-green-700,.app-dark .text-green-800{color:#86efac !important;}
+    .app-dark .text-red-500,.app-dark .text-red-600,.app-dark .text-red-700,.app-dark .text-red-800{color:#fca5a5 !important;}
+    .app-dark .text-amber-500,.app-dark .text-amber-600,.app-dark .text-amber-700,.app-dark .text-amber-800,.app-dark .text-yellow-700{color:#fcd34d !important;}
+    .app-dark .text-purple-500,.app-dark .text-purple-600,.app-dark .text-purple-700,.app-dark .text-purple-800{color:#c4b5fd !important;}
+    .app-dark .text-indigo-500,.app-dark .text-indigo-600,.app-dark .text-indigo-700,.app-dark .text-indigo-800{color:#a5b4fc !important;}
+    .app-dark .text-cyan-500,.app-dark .text-cyan-700{color:#67e8f9 !important;}
+    .app-dark .text-orange-500,.app-dark .text-orange-600,.app-dark .text-orange-700{color:#fdba74 !important;}
+    .app-dark .text-pink-500,.app-dark .text-pink-700,.app-dark .text-pink-800{color:#f9a8d4 !important;}
+    .app-dark .text-teal-500,.app-dark .text-teal-600,.app-dark .text-teal-700{color:#5eead4 !important;}
+
+    /* 成績表（凍結欄 / 表頭 / 列） */
+    .app-dark .grades-table thead th{background-color:#1c262e !important;color:#cdd5dc !important;}
+    .app-dark .grades-table .frozen-sn,
+    .app-dark .grades-table .frozen-name,
+    .app-dark .grades-table .frozen-class{background-color:#18222a !important;}
+    .app-dark .grades-table thead .frozen-sn,
+    .app-dark .grades-table thead .frozen-name,
+    .app-dark .grades-table thead .frozen-class{background-color:#1c262e !important;}
+    .app-dark .grades-table .stats-frozen-sn,
+    .app-dark .grades-table .stats-frozen-name,
+    .app-dark .grades-table .stats-frozen-class{background-color:#1c262e !important;}
+    .app-dark .grades-table td,.app-dark .grades-table th{border-color:rgba(255,255,255,0.08) !important;}
+    .app-dark .grades-table tbody tr.bg-gray-50 td,
+    .app-dark .grades-table tbody tr.bg-gray-50{background-color:#141d24 !important;}
+    .app-dark .grades-cell:hover{background:rgba(var(--theme-primary-rgb),0.18) !important;}
+    .app-dark .grades-cell.cell-readonly{background:#10181e !important;color:#9aa5ad;}
+    .app-dark .grades-cell.cell-bonus{background:#2a2620 !important;color:#cbb89a;}
+    .app-dark .grades-table tr.row-hover-highlight .frozen-sn,
+    .app-dark .grades-table tr.row-hover-highlight .frozen-name,
+    .app-dark .grades-table tr.row-hover-highlight .frozen-class{
+      background-color:#1f2933 !important;
+      background-image:linear-gradient(rgba(var(--theme-primary-rgb),0.14), rgba(var(--theme-primary-rgb),0.14)) !important;
+    }
+
+    /* 計分結果表 */
+    .app-dark .scoring-result-table .sn-col,
+    .app-dark .scoring-result-table .name-col{background:#18222a !important;}
+    .app-dark .scoring-result-table tbody tr:hover td{background:#1f2933 !important;}
+    .app-dark .calc-cell{background:#1b2530 !important;color:#dde3e8;}
+    .app-dark .calc-cell-key{background:#25313d !important;color:#f0ece1;}
+
+    /* 詳情面板 */
+    .app-dark .detail-panel{background:#18222a !important;border-color:rgba(255,255,255,0.08) !important;color:#dde3e8;}
+
+    /* 月曆 */
+    .app-dark .calendar-glass{
+      background:
+        radial-gradient(circle at 15% 0%, rgba(var(--theme-secondary-rgb),0.18), transparent 26rem),
+        radial-gradient(circle at 100% 18%, rgba(var(--theme-accent-rgb),0.16), transparent 24rem),
+        rgba(24,34,42,0.86) !important;
+      border-color:rgba(255,255,255,0.08);
+    }
+    .app-dark .cal-day:hover{background:#1a2730 !important;}
+    .app-dark .cal-popover{background:#18222a !important;border-color:rgba(255,255,255,0.08) !important;}
+    .app-dark .cal-progress-bar{background:#2a3540 !important;}
+    .app-dark .cal-week-day.bg-white{background-color:#18222a !important;}
+
+    /* 分段控制 / 卡片 / 群組標題 */
+    .app-dark .seg-track{background:#0f171d !important;}
+    .app-dark .seg-thumb-pill{background:linear-gradient(135deg,#2a3540,rgba(var(--theme-primary-rgb),0.30)) !important;}
+    .app-dark .seg-option{color:#9aa5ad;}
+    .app-dark .seg-option.seg-active{color:#f0ece1;}
+    .app-dark .match-option-card{background:#18222a !important;border-color:rgba(255,255,255,0.1) !important;}
+    .app-dark .match-option-card:hover{background:#1f2933 !important;}
+    .app-dark .match-option-card.active{background:rgba(var(--theme-primary-rgb),0.14) !important;}
+    .app-dark .custom-cat-row:hover{background-color:#1f2933 !important;}
+    .app-dark .custom-cat-delete-btn{border-left-color:rgba(255,255,255,0.1) !important;}
+    .app-dark .analysis-group-header{background:#1c2733 !important;}
+    .app-dark .analysis-group-header:hover{background:#243140 !important;}
+
+    /* 設定頁元件 */
+    .app-dark .settings-back-btn{background:#18222a !important;border-color:rgba(255,255,255,0.12) !important;color:#dde3e8 !important;}
+    .app-dark .settings-back-btn:hover{background:#1f2933 !important;color:#f0ece1 !important;}
+    .app-dark .year-tab-btn{color:#9aa5ad;}
+    .app-dark .year-tab-btn:hover{background:#1f2933 !important;color:#dde3e8;}
+    .app-dark .view-toggle-btn{color:#9aa5ad;}
+    .app-dark .view-toggle-btn.active{background:#26323d !important;}
+
+    /* 報表高亮列（深色版） */
+    .app-dark .report-row-highlight-pass td{background-color:rgba(34,197,94,0.18) !important;}
+    .app-dark .report-row-highlight-good td{background-color:rgba(59,130,246,0.18) !important;}
+    .app-dark .report-row-highlight-excellent td{background-color:rgba(168,85,247,0.18) !important;}
+
+    /* 學年載入覆蓋層 / 捲軸 */
+    .app-dark .year-loading-overlay{background:rgba(12,17,22,0.72) !important;}
+    .app-dark ::-webkit-scrollbar-track{background:#10181e;}
+    .app-dark ::-webkit-scrollbar-thumb{background:#3a4650;}
+    .app-dark ::-webkit-scrollbar-thumb:hover{background:#4a5862;}
   </style>
 </head>
 <body>
@@ -341,6 +669,139 @@
       </div>
     </div>
   </transition>
+
+  <!-- ★ v27: Profile 登入閘（重新設計 — 深色書院風 / 帳戶選擇無白卡 / 暖金點綴） -->
+  <div v-if="appState === 'profileGate'" class="profile-gate">
+    <div class="profile-gate-bg"></div>
+    <div class="profile-gate-inner">
+      <div class="text-center mb-9">
+        <div class="profile-gate-logo mx-auto mb-5"><i class="fas fa-graduation-cap"></i></div>
+        <h1 class="profile-gate-title">成績管理系統</h1>
+        <div class="profile-gate-divider"></div>
+        <p class="profile-gate-subtitle">
+          <span v-if="authStep==='createAdmin'">歡迎使用 · 請先建立管理員帳戶</span>
+          <span v-else-if="authStep==='select'">請選擇您的帳戶以繼續</span>
+          <span v-else>輸入密碼以登入您的帳戶</span>
+        </p>
+      </div>
+
+      <!-- ★ v28: @after-enter 在過場動畫完成後自動聚焦密碼欄（解決選擇帳戶後需手動點擊才能輸入的問題） -->
+      <transition name="auth-step" mode="out-in" @after-enter="onAuthStepEntered">
+        <!-- 選擇帳戶（無卡片，頭像直接浮於背景） -->
+        <div v-if="authStep==='select'" key="select">
+          <div v-if="profilesLoading" class="text-center py-16" style="color:rgba(214,221,224,0.6)">
+            <i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i>
+            <div class="text-sm">正在載入帳戶...</div>
+          </div>
+          <div v-else-if="profileError" class="text-center py-12" style="color:#fca5a5">
+            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+            <div class="text-sm mb-4">{{profileError}}</div>
+            <button @click="loadProfiles" class="px-4 py-2 rounded-lg text-sm" style="background:rgba(255,255,255,0.08);color:#f0ece1;border:1px solid rgba(255,255,255,0.14)"><i class="fas fa-redo mr-1"></i>重新載入</button>
+          </div>
+          <div v-else-if="sortedProfiles.length===0" class="text-center py-12" style="color:rgba(214,221,224,0.55)">
+            <i class="fas fa-user-slash text-3xl mb-3"></i>
+            <div class="text-sm">尚無任何帳戶</div>
+          </div>
+          <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4 max-w-2xl mx-auto">
+            <button v-for="p in sortedProfiles" :key="p.id" @click="selectProfileToLogin(p)" class="profile-pick group">
+              <div class="profile-avatar" :style="profileAvatarStyle(p)">
+                {{profileInitial(p)}}
+                <span v-if="p.role==='admin'" class="profile-admin-badge" title="管理員"><i class="fas fa-crown"></i></span>
+              </div>
+              <div class="profile-pick-name">{{p.name}}</div>
+              <div class="profile-pick-status">
+                <span v-if="!p.passwordSet" style="color:#e6b948"><i class="fas fa-key text-xs mr-0.5"></i>首次登入</span>
+                <span v-else style="color:rgba(214,221,224,0.45)"><i class="fas fa-lock text-xs mr-0.5"></i>需密碼</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 輸入密碼 -->
+        <div v-else-if="authStep==='enterPassword'" key="enterPw" class="profile-glass-card profile-glass-card-sm">
+          <div class="text-center mb-6">
+            <div class="profile-avatar-lg mx-auto" :style="profileAvatarStyle(authSelectedProfile)">{{profileInitial(authSelectedProfile)}}</div>
+            <h2 class="text-xl font-bold mt-3" style="color:#f0ece1">{{authSelectedProfile ? authSelectedProfile.name : ''}}</h2>
+            <p class="text-sm mt-1" style="color:rgba(214,221,224,0.55)">請輸入密碼以登入</p>
+          </div>
+          <form @submit.prevent="submitEnterPassword">
+            <div class="relative mb-3">
+              <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input ref="authPwInput" v-model="authPasswordInput" type="password" placeholder="輸入密碼" autocomplete="current-password" class="profile-input">
+            </div>
+            <div v-if="authError" class="text-sm mb-3 text-center" style="color:#fca5a5"><i class="fas fa-exclamation-circle mr-1"></i>{{authError}}</div>
+            <button type="submit" :disabled="authProcessing" class="profile-btn-primary">
+              <i v-if="authProcessing" class="fas fa-circle-notch fa-spin mr-1"></i><i v-else class="fas fa-sign-in-alt mr-1"></i>登入
+            </button>
+          </form>
+          <button @click="backToProfileSelect" class="profile-btn-back"><i class="fas fa-arrow-left mr-1"></i>返回選擇帳戶</button>
+        </div>
+
+        <!-- 首次登入：設定密碼 -->
+        <div v-else-if="authStep==='setPassword'" key="setPw" class="profile-glass-card profile-glass-card-sm">
+          <div class="text-center mb-6">
+            <div class="profile-avatar-lg mx-auto" :style="profileAvatarStyle(authSelectedProfile)">{{profileInitial(authSelectedProfile)}}</div>
+            <h2 class="text-xl font-bold mt-3" style="color:#f0ece1">{{authSelectedProfile ? authSelectedProfile.name : ''}}</h2>
+            <p class="text-sm mt-1" style="color:#e6b948"><i class="fas fa-star mr-1"></i>首次登入，請設定您的密碼</p>
+          </div>
+          <form @submit.prevent="submitSetPassword">
+            <div class="relative mb-3">
+              <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input ref="authPwInput" v-model="authPasswordInput" type="password" placeholder="設定密碼（至少 4 字元）" autocomplete="new-password" class="profile-input">
+            </div>
+            <div class="relative mb-3">
+              <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input v-model="authPasswordConfirm" type="password" placeholder="再次輸入密碼確認" autocomplete="new-password" class="profile-input">
+            </div>
+            <div v-if="authError" class="text-sm mb-3 text-center" style="color:#fca5a5"><i class="fas fa-exclamation-circle mr-1"></i>{{authError}}</div>
+            <button type="submit" :disabled="authProcessing" class="profile-btn-primary">
+              <i v-if="authProcessing" class="fas fa-circle-notch fa-spin mr-1"></i><i v-else class="fas fa-check mr-1"></i>設定密碼並登入
+            </button>
+          </form>
+          <button @click="backToProfileSelect" class="profile-btn-back"><i class="fas fa-arrow-left mr-1"></i>返回選擇帳戶</button>
+        </div>
+
+        <!-- 建立管理員（第一個帳戶） -->
+        <div v-else-if="authStep==='createAdmin'" key="admin" class="profile-glass-card profile-glass-card-sm">
+          <div class="text-center mb-6">
+            <div class="profile-gate-crown mx-auto"><i class="fas fa-crown"></i></div>
+            <h2 class="text-xl font-bold mt-3" style="color:#f0ece1">建立管理員帳戶</h2>
+            <p class="text-sm mt-1" style="color:rgba(214,221,224,0.55)">這是第一個帳戶，將成為系統管理員</p>
+          </div>
+          <form @submit.prevent="submitCreateAdmin">
+            <label class="profile-label">您的名稱</label>
+            <div class="relative mb-4">
+              <i class="fas fa-user absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input v-model="profileFormName" placeholder="例：陳老師" class="profile-input">
+            </div>
+            <label class="profile-label">選擇頭像顏色</label>
+            <div class="flex flex-wrap gap-2 mb-5">
+              <button v-for="c in profileColorOptions" :key="c.key" type="button" @click="profileFormColor=c.key"
+                class="profile-color-swatch" :class="profileFormColor===c.key ? 'active' : ''"
+                :style="profileAvatarStyle({color:c.key})" :title="c.label">
+                <i v-if="profileFormColor===c.key" class="fas fa-check"></i>
+              </button>
+            </div>
+            <label class="profile-label">設定密碼</label>
+            <div class="relative mb-3">
+              <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input v-model="authPasswordInput" type="password" placeholder="設定密碼（至少 4 字元）" autocomplete="new-password" class="profile-input">
+            </div>
+            <div class="relative mb-3">
+              <i class="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2" style="color:rgba(214,221,224,0.4)"></i>
+              <input v-model="authPasswordConfirm" type="password" placeholder="再次輸入密碼確認" autocomplete="new-password" class="profile-input">
+            </div>
+            <div v-if="authError" class="text-sm mb-3 text-center" style="color:#fca5a5"><i class="fas fa-exclamation-circle mr-1"></i>{{authError}}</div>
+            <button type="submit" :disabled="authProcessing" class="profile-btn-primary">
+              <i v-if="authProcessing" class="fas fa-circle-notch fa-spin mr-1"></i><i v-else class="fas fa-arrow-right mr-1"></i>建立並進入系統
+            </button>
+          </form>
+        </div>
+      </transition>
+
+      <p class="text-center profile-gate-footer mt-7">每位老師擁有獨立的班別、學生與成績資料</p>
+    </div>
+  </div>
 
   <div class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="min-width:260px">
     <transition-group name="toast">
@@ -1216,24 +1677,119 @@
           </div>
         </template>
 
-        <template v-if="modalType==='deleteConfirm'">
-          <div class="text-center py-4"><i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3"></i><p class="text-gray-800 font-medium">{{modalData.message}}</p><p v-if="modalData.submessage" class="text-gray-500 text-sm mt-1">{{modalData.submessage}}</p></div>
+        <!-- ★ v26: 新增 / 編輯老師帳戶 -->
+        <template v-if="modalType==='addProfile'||modalType==='editProfile'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">老師名稱</label>
+            <input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：陳老師">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">頭像顏色</label>
+            <div class="flex flex-wrap gap-2">
+              <button v-for="c in profileColorOptions" :key="c.key" type="button" @click="modalData.color=c.key"
+                class="w-9 h-9 rounded-full border-2 flex items-center justify-center text-white text-xs transition hover:scale-110"
+                :class="modalData.color===c.key ? 'border-gray-800' : 'border-transparent'"
+                :style="profileAvatarStyle({color:c.key})" :title="c.label">
+                <i v-if="modalData.color===c.key" class="fas fa-check"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="modalType==='addProfile'">
+            <label class="block text-sm font-medium text-gray-700 mb-2">角色</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer transition" :class="modalData.role==='teacher' ? 'border-blue-400 bg-blue-50' : 'border-gray-200'">
+                <input type="radio" value="teacher" v-model="modalData.role" class="text-blue-500">
+                <span class="text-sm"><i class="fas fa-chalkboard-teacher text-gray-400 mr-1"></i>老師</span>
+              </label>
+              <label class="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer transition" :class="modalData.role==='admin' ? 'border-amber-400 bg-amber-50' : 'border-gray-200'">
+                <input type="radio" value="admin" v-model="modalData.role" class="text-amber-500">
+                <span class="text-sm"><i class="fas fa-crown text-amber-400 mr-1"></i>管理員</span>
+              </label>
+            </div>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+            <i class="fas fa-info-circle mr-1"></i>
+            <span v-if="modalType==='addProfile'">新帳戶的密碼由該老師首次登入時自行設定，管理員無法查看或指定其密碼。每位老師擁有獨立的班別、學生與成績資料。</span>
+            <span v-else>變更名稱與頭像顏色會立即套用。</span>
+          </div>
+        </template>
+
+        <!-- ★ v26: 修改自己的密碼 -->
+        <template v-if="modalType==='changePassword'">
+          <div v-if="currentProfile && currentProfile.passwordSet">
+            <label class="block text-sm font-medium text-gray-700 mb-1">目前密碼</label>
+            <input v-model="modalData.oldPw" type="password" autocomplete="current-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="輸入目前密碼">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">新密碼</label>
+            <input v-model="modalData.newPw" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="至少 4 個字元">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">確認新密碼</label>
+            <input v-model="modalData.newPw2" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="再次輸入新密碼">
+          </div>
+        </template>
+
+        <!-- ★ v26: 刪除/重設密碼 與一般刪除共用確認版面 -->
+        <template v-if="modalType==='deleteConfirm'||modalType==='profileDeleteConfirm'||modalType==='profileResetPwConfirm'">
+          <div class="text-center py-4">
+            <i class="fas text-4xl mb-3" :class="modalType==='profileResetPwConfirm' ? 'fa-key text-amber-400' : 'fa-exclamation-triangle text-red-400'"></i>
+            <p class="text-gray-800 font-medium">{{modalData.message}}</p>
+            <p v-if="modalData.submessage" class="text-gray-500 text-sm mt-1">{{modalData.submessage}}</p>
+          </div>
         </template>
       </div>
       <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t bg-gray-50">
         <button @click="closeModal" type="button" class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-        <button @click="confirmModal" type="button" class="px-4 py-2 text-sm text-white rounded-lg" :class="modalType==='deleteConfirm'?'bg-red-500 hover:bg-red-600':'bg-blue-500 hover:bg-blue-600'">{{modalType==='deleteConfirm'?'確認刪除':(modalType==='applyTemplateConfirm'?'確認套用':'確認')}}</button>
+        <button @click="confirmModal" type="button" class="px-4 py-2 text-sm text-white rounded-lg"
+          :class="(modalType==='deleteConfirm'||modalType==='profileDeleteConfirm') ? 'bg-red-500 hover:bg-red-600' : (modalType==='profileResetPwConfirm' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-500 hover:bg-blue-600')">
+          {{ (modalType==='deleteConfirm'||modalType==='profileDeleteConfirm') ? '確認刪除' : (modalType==='applyTemplateConfirm' ? '確認套用' : (modalType==='profileResetPwConfirm' ? '確認重設' : '確認')) }}
+        </button>
       </div>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div v-if="!loading" class="h-screen flex flex-col">
+  <div v-if="appState === 'app' && !loading" class="h-screen flex flex-col">
     <header :style="headerStyle" class="app-header text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
       <button v-if="currentView!=='home' && currentView!=='settings'" @click="leftPanelOpen=!leftPanelOpen" class="p-1.5 rounded-lg hover:bg-white/20 transition"><i class="fas fa-bars"></i></button>
       <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">{{settings.schoolName ? settings.schoolName : '成績管理系統'}}</h1>
       <div class="flex-1"></div>
       <div v-if="currentAcademicYear" class="text-xs sm:text-sm opacity-90 hidden sm:block truncate max-w-xs"><span>{{currentAcademicYear.name}}</span><span v-if="currentClass"> / {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></span></div>
+
+      <!-- ★ v28: 頂部快速切換深色 / 淺色模式 -->
+      <button @click="toggleDarkMode" class="p-1.5 rounded-lg hover:bg-white/20 transition shrink-0" :title="darkMode ? '切換至淺色模式' : '切換至深色模式'">
+        <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+      </button>
+
+      <!-- ★ v26: 目前登入帳戶選單（修改密碼 / 管理老師帳戶 / 切換帳戶） -->
+      <div class="relative shrink-0" v-if="currentProfile">
+        <button @click.stop="profileMenuOpen=!profileMenuOpen" class="flex items-center gap-1.5 sm:gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-white/20 transition">
+          <div class="profile-avatar-sm" :style="profileAvatarStyle(currentProfile)">{{profileInitial(currentProfile)}}</div>
+          <span class="hidden md:inline text-sm font-medium truncate" style="max-width:6rem">{{currentProfile.name}}</span>
+          <i class="fas fa-caret-down text-xs opacity-80"></i>
+        </button>
+        <transition name="fade">
+          <div v-if="profileMenuOpen" class="absolute top-full right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl overflow-hidden text-gray-700" style="z-index:60" @click.stop>
+            <div class="px-4 py-3 text-white" :style="bannerStyle">
+              <div class="flex items-center gap-3">
+                <div class="profile-avatar-md" :style="profileAvatarStyle(currentProfile)">{{profileInitial(currentProfile)}}</div>
+                <div class="min-w-0">
+                  <div class="font-bold truncate">{{currentProfile.name}}</div>
+                  <div class="text-xs opacity-90"><i :class="isCurrentProfileAdmin() ? 'fas fa-crown' : 'fas fa-chalkboard-teacher'" class="mr-1"></i>{{isCurrentProfileAdmin() ? '管理員' : '老師'}}</div>
+                </div>
+              </div>
+            </div>
+            <div class="py-1.5">
+              <button @click="toggleDarkMode(); profileMenuOpen=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2.5 transition"><i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'" class="text-gray-400 w-4 text-center"></i><span>{{darkMode ? '切換至淺色模式' : '切換至深色模式'}}</span></button>
+              <button @click="openChangePasswordModal(); profileMenuOpen=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2.5 transition"><i class="fas fa-key text-gray-400 w-4 text-center"></i><span>修改密碼</span></button>
+              <button v-if="isCurrentProfileAdmin()" @click="currentView='settings'; settingsNav=[{key:'profiles',label:'老師帳戶管理'}]; profileMenuOpen=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2.5 transition"><i class="fas fa-user-shield text-gray-400 w-4 text-center"></i><span>管理老師帳戶</span></button>
+              <div class="border-t border-gray-100 my-1"></div>
+              <button @click="logoutProfile()" class="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2.5 transition"><i class="fas fa-sign-out-alt text-red-400 w-4 text-center"></i><span>切換帳戶</span></button>
+            </div>
+          </div>
+        </transition>
+      </div>
     </header>
     <nav class="app-nav bg-white border-b shrink-0 flex overflow-x-auto">
       <button v-for="tab in orderedTabs" :key="tab.key" @click="switchToTab(tab.key)" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition" :class="currentView===tab.key?'':'border-transparent text-gray-500 hover:text-gray-700'" :style="currentView===tab.key?activeTabStyle:{}">
@@ -1740,7 +2296,7 @@
                   <span class="truncate font-medium">{{tpl.name}}</span>
                   <span class="text-gray-400 shrink-0">{{tpl.ut.assignment}}/{{tpl.ut.quiz}}/{{tpl.ut.unifiedTest}}/{{tpl.ut.classPerformance}}</span>
                 </div>
-                <div v-if="tpl.subject || tpl.level" class="flex flex-wrap gap-1">
+<div v-if="tpl.subject || tpl.level" class="flex flex-wrap gap-1">
                   <span v-if="tpl.subject" class="inline-block px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 font-normal">{{tpl.subject}}</span>
                   <span v-if="tpl.level" class="inline-block px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-normal">{{tpl.level}}</span>
                 </div>
@@ -2585,12 +3141,59 @@
 
   <div v-if="settingsCurrentView==='root'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
     <div @click="settingsEnter({key:'years',label:'學年管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><i class="fas fa-sitemap text-blue-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-blue-600">學年班別管理</h3></div><p class="text-sm text-gray-500">管理學年、班別、科目及學生</p></div>
-    <div @click="settingsEnter({key:'layout',label:'外觀設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center shrink-0"><i class="fas fa-palette text-pink-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-pink-600">外觀設定</h3></div><p class="text-sm text-gray-500">自訂介面主題顏色與標籤排序</p></div>
+    <div @click="settingsEnter({key:'layout',label:'外觀設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center shrink-0"><i class="fas fa-palette text-pink-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-pink-600">外觀設定</h3></div><p class="text-sm text-gray-500">自訂介面主題顏色、深色模式與標籤排序</p></div>
     <div @click="settingsEnter({key:'quicknav',label:'快速導航設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0"><i class="fas fa-th-large text-green-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-green-600">快速導航設定</h3></div><p class="text-sm text-gray-500">自訂首頁快速導航項目</p></div>
     <div @click="settingsEnter({key:'basic',label:'基本設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0"><i class="fas fa-school text-cyan-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-cyan-600">基本設定</h3></div><p class="text-sm text-gray-500">學校名稱、老師姓名、預設滿分</p></div>
     <div @click="settingsEnter({key:'termDates',label:'學期日期設定'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center shrink-0"><i class="fas fa-calendar-week text-orange-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-orange-600">學期日期設定</h3></div><p class="text-sm text-gray-500">設定上下學期起訖，自動判斷項目學期</p></div>
     <div @click="settingsEnter({key:'templates',label:'計分模板'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0"><i class="fas fa-clone text-indigo-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-indigo-600">計分模板</h3></div><p class="text-sm text-gray-500">建立可重用的計分權重組合</p></div>
 
+    <!-- ★ v26: 老師帳戶管理（僅管理員可見） -->
+    <div v-if="isCurrentProfileAdmin()" @click="settingsEnter({key:'profiles',label:'老師帳戶管理'})" class="bg-white rounded-xl shadow p-4 sm:p-5 cursor-pointer hover:shadow-md transition group"><div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0"><i class="fas fa-user-shield text-amber-500"></i></div><h3 class="font-bold text-gray-800 group-hover:text-amber-600">老師帳戶管理</h3></div><p class="text-sm text-gray-500">新增、編輯及管理其他老師帳戶</p></div>
+  </div>
+
+  <!-- ★ v26: 老師帳戶管理（僅管理員） -->
+  <div v-if="settingsCurrentView==='profiles'">
+    <div v-if="!isCurrentProfileAdmin()" class="text-center text-gray-400 py-12">
+      <i class="fas fa-lock text-4xl mb-3"></i>
+      <p>只有管理員可以管理老師帳戶</p>
+    </div>
+    <template v-else>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base sm:text-lg font-bold text-gray-800">老師帳戶管理</h2>
+        <button @click="openAddProfileModal" class="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"><i class="fas fa-user-plus mr-1"></i>新增老師</button>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-700">
+        <div class="flex items-start gap-2">
+          <i class="fas fa-info-circle mt-0.5"></i>
+          <div>
+            新增帳戶後，密碼由該老師首次登入時自行設定，管理員無法查看或指定其密碼。每位老師擁有獨立的班別、學生與成績資料，互不影響。
+          </div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <div v-for="p in sortedProfiles" :key="p.id" class="bg-white rounded-xl shadow p-3 sm:p-4 flex items-center gap-3 group hover:shadow-md transition">
+          <div class="profile-avatar-md" :style="profileAvatarStyle(p)">
+            {{profileInitial(p)}}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-800 truncate flex items-center gap-2 flex-wrap">
+              <span>{{p.name}}</span>
+              <span v-if="p.role==='admin'" class="inline-block px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-normal"><i class="fas fa-crown mr-0.5"></i>管理員</span>
+              <span v-else class="inline-block px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 font-normal"><i class="fas fa-chalkboard-teacher mr-0.5"></i>老師</span>
+              <span v-if="p.id===currentProfileId" class="inline-block px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700 font-normal">目前登入</span>
+            </div>
+            <div class="text-xs text-gray-500 mt-0.5">
+              <span v-if="p.passwordSet"><i class="fas fa-lock mr-0.5"></i>已設定密碼</span>
+              <span v-else class="text-amber-500"><i class="fas fa-key mr-0.5"></i>尚未設定密碼（待首次登入）</span>
+            </div>
+          </div>
+          <button @click="openEditProfileModal(p)" class="p-1.5 text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 shrink-0" title="編輯"><i class="fas fa-edit"></i></button>
+          <button v-if="p.passwordSet && p.id!==currentProfileId" @click="confirmResetProfilePassword(p)" class="p-1.5 text-gray-400 hover:text-amber-500 opacity-0 group-hover:opacity-100 shrink-0" title="重設密碼"><i class="fas fa-key"></i></button>
+          <button v-if="p.id!==currentProfileId" @click="confirmDeleteProfile(p)" class="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 shrink-0" title="刪除"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+      <div v-if="sortedProfiles.length===0" class="text-center text-gray-400 py-12">尚無老師帳戶</div>
+    </template>
   </div>
 
   <!-- ★ 第六輪：基本設定（v22 修正：max-w-xl + mx-auto 居中顯示，桌面屏不再偏左） -->
@@ -2840,6 +3443,35 @@
   </div>
 
   <div v-if="settingsCurrentView==='layout'">
+    <!-- ★ v28: 顯示模式（淺色 / 深色）切換卡片 -->
+    <div class="glass-card rounded-xl p-4 mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base sm:text-lg font-bold text-gray-800"><i class="fas fa-circle-half-stroke mr-1" :style="{color:'var(--theme-primary)'}"></i>顯示模式</h2>
+        <span class="text-sm font-semibold px-2.5 py-1 rounded-full" :style="{background:'var(--theme-soft-bg)',color:'var(--theme-text)',boxShadow:'inset 0 0 0 1px var(--theme-soft-border)'}">{{darkMode ? '深色模式' : '淺色模式'}}</span>
+      </div>
+      <p class="text-sm text-gray-500 mb-3">切換整個系統的介面為淺色或深色（書院風）。此設定會跟隨您的帳戶獨立儲存。</p>
+      <div class="grid grid-cols-2 gap-3">
+        <button @click="darkMode && toggleDarkMode()" type="button"
+          class="rounded-xl p-3 border-2 text-left transition"
+          :class="!darkMode ? 'theme-swatch-active' : 'border-gray-200 hover:border-gray-300'">
+          <div class="rounded-lg p-3 mb-2" style="background:linear-gradient(135deg,#f8fafc,#eef2ff);box-shadow:inset 0 0 0 1px rgba(15,23,42,0.06)">
+            <div class="w-full h-2 rounded mb-1.5" style="background:linear-gradient(90deg,#2563eb,#38bdf8)"></div>
+            <div class="w-2/3 h-1.5 rounded bg-gray-300"></div>
+          </div>
+          <div class="flex items-center gap-2 text-sm font-semibold text-gray-700"><i class="fas fa-sun text-amber-500"></i>淺色模式</div>
+        </button>
+        <button @click="!darkMode && toggleDarkMode()" type="button"
+          class="rounded-xl p-3 border-2 text-left transition"
+          :class="darkMode ? 'theme-swatch-active' : 'border-gray-200 hover:border-gray-300'">
+          <div class="rounded-lg p-3 mb-2" style="background:linear-gradient(165deg,#0c1116,#18222a);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08)">
+            <div class="w-full h-2 rounded mb-1.5" style="background:linear-gradient(90deg,#2563eb,#38bdf8)"></div>
+            <div class="w-2/3 h-1.5 rounded" style="background:#3a4650"></div>
+          </div>
+          <div class="flex items-center gap-2 text-sm font-semibold text-gray-700"><i class="fas fa-moon text-indigo-400"></i>深色模式</div>
+        </button>
+      </div>
+    </div>
+
     <!-- ★ v19: 目前主題預覽卡片 -->
     <div class="theme-preview-card glass-card rounded-xl p-4 mb-5">
       <div class="flex items-center justify-between mb-3">
@@ -2898,6 +3530,7 @@
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/constants.js"></script>
+<script src="js/profile-module.js"></script>
 <script src="js/grades-module.js"></script>
 <script src="js/scoring-module.js"></script>
 <script src="js/calendar-module.js"></script>

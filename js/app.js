@@ -1,11 +1,10 @@
 // ================================================================
-// Main Application (v25 — 
-//   req1) frozen column z-index + highlight bg fix (cell selection no longer covers frozen cols)
-//   req2) new-student match badge has no hover tooltip
-//   req3) match status only shown in subject/elective classes (not regular)
-//   req4) desktop calendar taller cells + prettier event pills (calMonthEventLimit)
-//   req5) cross-year analysis: tree-based year→class→student selection
-//   req6) clicking cross-year tab resets back to search/select page)
+// Main Application (v28 —
+//   ★ v28 新增：
+//     1. 選擇帳戶後自動聚焦密碼輸入框（透過 @after-enter）
+//     2. 深色模式（與登入閘一致的書院風格），可於「外觀設定」切換，
+//        並以每位老師獨立偏好儲存（settings/main.darkMode）
+//   （承 v26：多老師 Profile + 密碼登入系統）
 // ================================================================
 const { createApp } = Vue;
 
@@ -104,7 +103,28 @@ createApp({
       // ★ v25: 自訂匹配狀態 tooltip
       matchTooltip: null,
       matchTooltipTimer: null,
-      matchTooltipDelay: 0    };
+      matchTooltipDelay: 0,
+
+      // ★ v26: Profile / 多老師登入系統
+      appState: 'loading',        // 'loading' | 'profileGate' | 'app'
+      profiles: [],
+      profilesLoading: true,
+      profileError: '',
+      currentProfileId: null,
+      currentProfile: null,
+      authStep: null,             // 'select' | 'enterPassword' | 'setPassword' | 'createAdmin'
+      authSelectedProfile: null,
+      authPasswordInput: '',
+      authPasswordConfirm: '',
+      authError: '',
+      authProcessing: false,
+      profileFormName: '',
+      profileFormColor: 'blue',
+      profileMenuOpen: false,
+
+      // ★ v28: 深色模式（淺色 / 深色介面切換，跟隨每位老師偏好儲存）
+      darkMode: false
+    };
   },
 
   computed: {
@@ -237,7 +257,10 @@ createApp({
         calAddAssessment:'從月曆新增項目',
         addCustomCategory:'新增自訂類別',
         addTemplate:'新增計分模板', editTemplate:'編輯計分模板',
-        applyTemplateConfirm:'套用計分模板'
+        applyTemplateConfirm:'套用計分模板',
+        addProfile:'新增老師帳戶', editProfile:'編輯老師帳戶',
+        changePassword:'修改密碼',
+        profileDeleteConfirm:'刪除老師帳戶', profileResetPwConfirm:'重設老師密碼'
       };
       return map[this.modalType]||'';
     },
@@ -325,11 +348,13 @@ createApp({
         .slice(0, 30);
     },
 
-    ...GradesComputed, ...ScoringComputed, ...CalendarComputed, ...AnalysisComputed, ...SettingsComputed,
+    ...GradesComputed, ...ScoringComputed, ...CalendarComputed, ...AnalysisComputed, ...SettingsComputed, ...ProfileComputed,
   },
 
   watch: {
     currentTheme() { this.$nextTick(() => this.applyThemeTokens()); },
+    // ★ v28: 深色模式變更時即時套用至 <html>
+    darkMode() { this.applyDarkMode(); },
     currentAcademicYearId(nv, ov) {
       if (nv === ov) return;
       if (this.currentClassId) {
@@ -408,7 +433,7 @@ createApp({
   },
 
   methods: {
-    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods, ...SettingsMethods,
+    ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods, ...SettingsMethods, ...ProfileMethods,
 
     switchToTab(key) {
       if (key === 'settings') this.settingsNav = [];
@@ -909,10 +934,22 @@ createApp({
       set('--focus-ring', 'rgba(' + pRgb.join(',') + ',0.16)');
     },
 
+    // ★ v28: 深色模式套用 / 切換
+    applyDarkMode() {
+      const el = document.documentElement;
+      if (el) el.classList.toggle('app-dark', !!this.darkMode);
+    },
+    toggleDarkMode() {
+      this.darkMode = !this.darkMode;
+      this.applyDarkMode();
+      this.saveLayoutSettings();
+      this.addToast(this.darkMode ? '已切換至深色模式' : '已切換至淺色模式', 'success');
+    },
+
     setTheme(key) { this.currentTheme=key; this.applyThemeTokens(); this.saveLayoutSettings(); this.addToast('已切換至「'+this.themeColors.name+'」主題','success'); },
     moveTabUp(idx) { if(idx<=0)return;const a=[...this.tabOrder];[a[idx-1],a[idx]]=[a[idx],a[idx-1]];this.tabOrder=a;this.saveLayoutSettings(); },
     moveTabDown(idx) { if(idx>=this.tabOrder.length-1)return;const a=[...this.tabOrder];[a[idx],a[idx+1]]=[a[idx+1],a[idx]];this.tabOrder=a;this.saveLayoutSettings(); },
-    async saveLayoutSettings() { try{await db.collection('settings').doc('main').set({themeColor:this.currentTheme,tabOrder:this.tabOrder},{merge:true});}catch(e){console.error(e);} },
+    async saveLayoutSettings() { try{await db.collection('settings').doc('main').set({themeColor:this.currentTheme,tabOrder:this.tabOrder,darkMode:this.darkMode},{merge:true});}catch(e){console.error(e);} },
 
     getQuickNavItem(key) { return this.quickNavAllItems.find(i=>i.key===key)||{label:key,icon:'',gradient:['#999','#999'],desc:''}; },
     handleQuickNav(key) {
@@ -986,6 +1023,11 @@ createApp({
           case'addTemplate':await this.addTemplateConfirm();break;
           case'editTemplate':await this.updateTemplateConfirm();break;
           case'applyTemplateConfirm':await this.applyTemplateConfirm();break;
+          case'addProfile':await this.addProfileConfirm();break;
+          case'editProfile':await this.updateProfileConfirm();break;
+          case'changePassword':await this.changePasswordConfirm();break;
+          case'profileDeleteConfirm':await this.deleteProfile(this.modalData.id);this.closeModal();break;
+          case'profileResetPwConfirm':await this.resetProfilePassword(this.modalData.id);this.closeModal();break;
           case'deleteConfirm':await this.handleDelete();break;
         }
       } catch(err){this.addToast('操作失敗：'+err.message,'error');}
@@ -1059,9 +1101,7 @@ createApp({
         .grades-scroll-container.is-dragging { user-select: none; -webkit-user-select: none; }
         .grades-touch-device .grades-cell.cell-focused{outline:2px solid var(--theme-primary)!important;outline-offset:-2px}
 
-        /* ★ req1: 凍結欄必須永遠蓋在選取 / 聚焦資料格之上。
-           內文凍結欄 z-index 提升至 30（高於 cell-focused=2 / cell-selected=1），
-           表頭凍結欄 32，統計列凍結欄 29，徹底修正選取整列時左側班別/學號/姓名被覆蓋的問題。 */
+        /* ★ req1: 凍結欄必須永遠蓋在選取 / 聚焦資料格之上。 */
         .grades-table .frozen-sn,
         .grades-table .frozen-name,
         .grades-table .frozen-class { z-index: 30 !important; }
@@ -1120,12 +1160,16 @@ createApp({
     if (this.gradesIsTouchDevice) document.body.classList.add('grades-touch-device');
     this._injectCustomStyles();
     this.applyThemeTokens();
+    this.applyDarkMode(); // ★ v28: 初始套用深色模式狀態（預設淺色）
     this._updateCalMonthEventLimit(); // ★ req4
     this._analysisCharts = {};
     this._studentNameMatchTimer = null;
-    await this.loadAllData();
-    this.applyThemeTokens();
-    this.initScoringWeights();
+
+    // ★ v26: 先載入老師 Profile 清單；待選擇 Profile 並通過密碼驗證後（_enterProfile），才載入該老師的資料
+    await this.loadProfiles();
+    this.loading = false;
+    this.appState = 'profileGate';
+
     document.addEventListener('keydown',(e)=>{
       if(e.key==='Escape'){
         if(this.calendarEventPopover){ this.calendarEventPopover=null; return; }
@@ -1169,6 +1213,7 @@ createApp({
       this.gradesExportMenuOpen = false;
       this.scoringExportMenuOpen = false;
       this.scoringApplyMenuOpen = false;
+      this.profileMenuOpen = false;
       this.hideMatchTooltip();
       if (this.gradesDetailPanel) {
         if (!this._panelMousedownInside && !this._panelMouseupInside) {
