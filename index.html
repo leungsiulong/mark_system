@@ -642,6 +642,151 @@
     .app-dark ::-webkit-scrollbar-track{background:#10181e;}
     .app-dark ::-webkit-scrollbar-thumb{background:#3a4650;}
     .app-dark ::-webkit-scrollbar-thumb:hover{background:#4a5862;}
+
+
+    /* =========================================================
+   成績表欄寬及深色模式修正
+   ========================================================= */
+
+/* ---------- 1. 成績表不再強制鋪滿整個畫面 ---------- */
+
+.grades-table{
+  --grades-name-width:88px;
+
+  width:max-content;
+  min-width:0;
+  table-layout:auto;
+}
+
+/* 學號欄保持 48px，配合原有凍結欄 left 設定 */
+.grades-table .frozen-sn,
+.grades-table .stats-frozen-sn{
+  width:48px;
+  min-width:48px;
+  max-width:48px;
+}
+
+/* 選修科班別欄保持 56px，配合原有凍結欄 left 設定 */
+.grades-table .frozen-class,
+.grades-table .stats-frozen-class{
+  width:56px;
+  min-width:56px;
+  max-width:56px;
+}
+
+/* 姓名欄維持緊湊寬度 */
+.grades-table .frozen-name,
+.grades-table .stats-frozen-name{
+  width:var(--grades-name-width);
+  min-width:var(--grades-name-width);
+  max-width:var(--grades-name-width);
+  white-space:nowrap;
+}
+
+.grades-table .frozen-name{
+  padding-left:6px;
+  padding-right:6px;
+}
+
+/* 以內層元素限制長姓名，避免文字撐闊整欄 */
+.grades-table .grades-student-name{
+  display:block;
+  width:calc(var(--grades-name-width) - 14px);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+
+/* 手機版姓名欄稍為收窄 */
+@media (max-width:640px){
+  .grades-table{
+    --grades-name-width:80px;
+  }
+}
+
+
+/* ---------- 2. 深色模式：不合格改用暗紅底 ---------- */
+
+.app-dark .grades-cell.cell-fail{
+  background-color:#3b242c !important;
+  color:#fecaca !important;
+}
+
+.app-dark .grades-cell.cell-fail.cell-focused{
+  outline-color:#d87983 !important;
+}
+
+
+/* ---------- 3. 深色模式：首頁快速導航降低背景亮度 ---------- */
+
+/*
+  只混合卡片背景色，不對整張卡片套用 brightness，
+  因此不會連文字及圖示一起變暗。
+*/
+.app-dark .home-quicknav-card{
+  background-color:#a8b0b8 !important;
+  background-blend-mode:multiply !important;
+  box-shadow:0 8px 22px rgba(0,0,0,0.28) !important;
+}
+
+
+/* ---------- 4. 深色模式：月曆項目使用沉穩色系 ---------- */
+
+/* 課業：暗藍 */
+.app-dark .cal-event-month.bg-blue-500,
+.app-dark .cal-event.bg-blue-500{
+  background:linear-gradient(135deg,#25476a,#2a5580) !important;
+}
+
+/* 小測：暗綠 */
+.app-dark .cal-event-month.bg-green-500,
+.app-dark .cal-event.bg-green-500{
+  background:linear-gradient(135deg,#234f42,#2c6250) !important;
+}
+
+/* 統測：棕橙 */
+.app-dark .cal-event-month.bg-orange-500,
+.app-dark .cal-event.bg-orange-500{
+  background:linear-gradient(135deg,#68452b,#7c5432) !important;
+}
+
+/* 考試：暗紅 */
+.app-dark .cal-event-month.bg-red-500,
+.app-dark .cal-event.bg-red-500{
+  background:linear-gradient(135deg,#63373e,#764249) !important;
+}
+
+/* 課堂表現：暗紫 */
+.app-dark .cal-event-month.bg-purple-500,
+.app-dark .cal-event.bg-purple-500{
+  background:linear-gradient(135deg,#4b3b66,#5b487a) !important;
+}
+
+/* 自訂類別：暗青 */
+.app-dark .cal-event-month.bg-teal-500,
+.app-dark .cal-event.bg-teal-500{
+  background:linear-gradient(135deg,#24514f,#2c6460) !important;
+}
+
+/* 深色模式不再於 hover 時額外提高項目亮度 */
+.app-dark .cal-event-month:hover{
+  filter:none;
+}
+
+.app-dark .cal-event-month,
+.app-dark .cal-event{
+  box-shadow:0 2px 6px rgba(0,0,0,0.22);
+}
+
+
+/* ---------- 5. 深色模式：計算結果格線降低對比 ---------- */
+
+.app-dark .scoring-result-table th,
+.app-dark .scoring-result-table td{
+  border-color:rgba(255,255,255,0.09) !important;
+}
+
+
   </style>
 </head>
 <body>
@@ -1838,9 +1983,9 @@
               <button @click="goToQuickNavSettings" class="text-xs text-gray-500 hover:text-gray-700"><i class="fas fa-cog mr-1"></i>自訂</button>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-              <div v-for="item in activeQuickNavItems" :key="item.key" @click="handleQuickNav(item.key)"
-                class="p-3 sm:p-4 rounded-xl cursor-pointer text-white shadow hover:shadow-lg transition-all hover:-translate-y-0.5"
-                :style="{background:'linear-gradient(135deg,'+item.gradient[0]+','+item.gradient[1]+')'}">
+<div v-for="item in activeQuickNavItems" :key="item.key" @click="handleQuickNav(item.key)"
+  class="home-quicknav-card p-3 sm:p-4 rounded-xl cursor-pointer text-white shadow hover:shadow-lg transition-all hover:-translate-y-0.5"
+  :style="{background:'linear-gradient(135deg,'+item.gradient[0]+','+item.gradient[1]+')'}">
                 <i :class="item.icon" class="text-xl sm:text-2xl mb-1 sm:mb-2 opacity-90"></i>
                 <div class="font-semibold text-xs sm:text-sm">{{item.label}}</div>
                 <div class="text-xs opacity-75 mt-0.5 hidden sm:block">{{item.desc}}</div>
@@ -2179,7 +2324,11 @@
                   <tr v-for="(s,ri) in gradesSortedStudents" :key="s.id" class="hover:bg-gray-50/50" :class="{'row-hover-highlight': gradesHoverRow === ri || gradesFocusRow === ri}">
                     <td v-if="isCurrentClassElective" class="frozen-class text-center text-xs px-1 py-0.5 text-gray-600 bg-white">{{getStudentOriginClass(s)}}</td>
                     <td class="frozen-sn text-center text-sm px-1 py-0.5 text-gray-700 bg-white">{{s.studentNumber}}</td>
-                    <td class="frozen-name text-sm px-1 py-0.5 text-gray-800 bg-white truncate">{{s.studentName}}</td>
+                    <td class="frozen-name text-sm px-1 py-0.5 text-gray-800 bg-white">
+                      <span class="grades-student-name" :title="s.studentName">
+                       {{s.studentName}}
+                      </span>
+                    </td>
                     <td v-for="(col,ci) in gradesOrderedColumns" :key="col.colKey+s.id"
                         :class="gradesCellClass(ri,ci,s.id)"
                         :data-acol="ci"
