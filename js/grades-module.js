@@ -5,13 +5,45 @@
 
 const GradesMethods = {
 
-  gradesAutoSelectTerm() {
-    if (this.currentClass && this.currentClass.terms && this.currentClass.terms.length > 0) {
-      if (!this.gradesTermId || !this.currentClass.terms.find(t => t.id === this.gradesTermId)) {
-        this.gradesTermId = this._autoSelectTermByDate(this.currentClass, new Date());
-      }
-    } else {
+gradesAutoSelectTerm() {
+    const cls = this.currentClass;
+
+    if (!cls || !Array.isArray(cls.terms) || cls.terms.length === 0) {
       this.gradesTermId = null;
+      return;
+    }
+
+    // 固定學期順序：上學期在左，下學期在右。
+    // 保留原有學期物件、ID 及其評估／成績資料。
+    const getTermOrder = (term) => {
+      const name = String(term.name || '').replace(/\s+/g, '');
+
+      if (name.includes('上學期') || name.includes('第一學期')) {
+        return 0;
+      }
+
+      if (name.includes('下學期') || name.includes('第二學期')) {
+        return 1;
+      }
+
+      return 2;
+    };
+
+    const sortedTerms = [...cls.terms].sort(
+      (a, b) => getTermOrder(a) - getTermOrder(b)
+    );
+
+    // 只有順序不同時才更新，避免不必要的資料變動。
+    if (sortedTerms.some((term, index) => term !== cls.terms[index])) {
+      cls.terms.splice(0, cls.terms.length, ...sortedTerms);
+    }
+
+    // 保留原有的自動選擇學期邏輯。
+    if (
+      !this.gradesTermId ||
+      !cls.terms.some(term => term.id === this.gradesTermId)
+    ) {
+      this.gradesTermId = this._autoSelectTermByDate(cls, new Date());
     }
   },
 
@@ -620,8 +652,24 @@ const GradesMethods = {
     if (col.readOnly) cls += ' cell-readonly';
     const disp = this.gradesGetDisplayScore(studentId, ci);
     const rawScore = col.colType === 'simple' ? (col.assessment.scores || {})[studentId] : null;
-    if (col.colType === 'simple' && typeof rawScore === 'object' && rawScore !== null) cls += ' cell-bonus';
-    else if (col.colType === 'simple' && col.assessment.type === 'quiz' && parseFloat(rawScore) > col.fullMark) cls += ' cell-bonus';
+// Bonus 的 * 標記由 gradesGetDisplayScore 處理，保持原樣。
+// 背景色則只在「未封頂的實際總分 > 滿分」時才套用。
+if (col.colType === 'simple' && rawScore != null) {
+  const rawTotal = typeof rawScore === 'object'
+    ? (Number(rawScore.base) || 0) + (Number(rawScore.bonus) || 0)
+    : Number(rawScore);
+
+  const fullMark = Number(col.fullMark);
+
+  if (
+    Number.isFinite(rawTotal) &&
+    Number.isFinite(fullMark) &&
+    fullMark > 0 &&
+    rawTotal > fullMark
+  ) {
+    cls += ' cell-bonus';
+  }
+}
     if (disp !== '' && col.colType !== 'simple' || (col.colType === 'simple' && disp !== '')) {
       let numForCheck;
       if (col.colType === 'simple' && typeof rawScore === 'object') numForCheck = Math.min((rawScore.base||0)+(rawScore.bonus||0), col.fullMark);
