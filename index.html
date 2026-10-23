@@ -2,7 +2,10 @@
 <html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+>
   <title>成績管理系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -788,6 +791,9 @@
 
 
   </style>
+
+  <link rel="stylesheet" href="css/mobile-app.css">
+  
 </head>
 <body>
 <div id="app" v-cloak>
@@ -948,12 +954,42 @@
     </div>
   </div>
 
-  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="min-width:260px">
+<div
+    class="app-toasts fixed top-4 right-4 z-50 flex flex-col gap-2"
+    style="min-width:260px"
+  >
     <transition-group name="toast">
-      <div v-for="t in toasts" :key="t.id" class="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white text-sm" :class="{'bg-green-500':t.type==='success','bg-red-500':t.type==='error','bg-yellow-500':t.type==='warning','bg-blue-500':t.type==='info'}">
-        <i :class="{'fas fa-check-circle':t.type==='success','fas fa-exclamation-circle':t.type==='error','fas fa-exclamation-triangle':t.type==='warning','fas fa-info-circle':t.type==='info'}"></i>
+      <div
+        v-for="t in toasts"
+        :key="t.id"
+        class="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white text-sm"
+        :class="{
+          'bg-green-500': t.type === 'success',
+          'bg-red-500': t.type === 'error',
+          'bg-yellow-500': t.type === 'warning',
+          'bg-blue-500': t.type === 'info'
+        }"
+      >
+        <i
+          :class="{
+            'fas fa-check-circle': t.type === 'success',
+            'fas fa-exclamation-circle': t.type === 'error',
+            'fas fa-exclamation-triangle': t.type === 'warning',
+            'fas fa-info-circle': t.type === 'info'
+          }"
+          aria-hidden="true"
+        ></i>
+
         <span class="flex-1">{{t.message}}</span>
-        <button @click="removeToast(t.id)" class="ml-2 opacity-70 hover:opacity-100">&times;</button>
+
+        <button
+          type="button"
+          @click="removeToast(t.id)"
+          class="ml-2 opacity-70 hover:opacity-100"
+          aria-label="關閉通知"
+        >
+          &times;
+        </button>
       </div>
     </transition-group>
   </div>
@@ -981,12 +1017,23 @@
     <div class="flex justify-center"><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #1f2937"></div></div>
   </div>
 
-  <template v-if="calendarEventPopover">
-    <div class="fixed inset-0 z-40" @click="calClosePopover"></div>
+<template v-if="calendarEventPopover">
+    <div
+      class="app-event-backdrop fixed inset-0 z-40"
+      @click="calClosePopover"
+      aria-hidden="true"
+    ></div>
+
     <transition name="popover-pop" appear>
-      <div class="fixed z-50"
-        :style="{top: calendarEventPopover.y + 'px', left: calendarEventPopover.x + 'px', transform: 'translate(-50%, 0)'}"
-        @click.stop>
+      <div
+        class="app-event-sheet fixed z-50"
+        :style="{
+          top: calendarEventPopover.y + 'px',
+          left: calendarEventPopover.x + 'px',
+          transform: 'translate(-50%, 0)'
+        }"
+        @click.stop
+      >
         <div class="cal-popover w-80">
           <div class="px-4 py-3 text-white" :class="assessmentColor(calendarEventPopover.event.type)">
             <div class="flex items-start justify-between gap-2">
@@ -1056,47 +1103,119 @@
     </transition>
   </template>
 
-  <div v-if="calendarMoreEventsModal" class="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" @click.self="calCloseMoreEventsModal">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-      <div class="flex items-center justify-between px-4 py-3 border-b">
+<div
+    v-if="calendarMoreEventsModal"
+    class="app-modal fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4"
+    @click.self="calCloseMoreEventsModal"
+  >
+    <div
+      class="app-modal-panel bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-label="當日評估項目"
+    >
+      <div
+        class="app-modal-head flex items-center justify-between px-4 py-3 border-b"
+      >
         <h3 class="text-base font-bold text-gray-800">
-          <i class="fas fa-calendar-day text-blue-500 mr-1"></i>
+          <i
+            class="fas fa-calendar-day text-blue-500 mr-1"
+            aria-hidden="true"
+          ></i>
+
           {{calendarMoreEventsModal.date.getFullYear()}}年{{calendarMoreEventsModal.date.getMonth()+1}}月{{calendarMoreEventsModal.date.getDate()}}日
-          <span class="text-sm text-gray-500 ml-2">({{calendarMoreEventsModal.events.length}} 個項目)</span>
+
+          <span class="text-sm text-gray-500 ml-2">
+            ({{calendarMoreEventsModal.events.length}} 個項目)
+          </span>
         </h3>
-        <button @click="calCloseMoreEventsModal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+
+        <button
+          type="button"
+          @click="calCloseMoreEventsModal"
+          class="text-gray-400 hover:text-gray-600 text-xl"
+          aria-label="關閉當日項目"
+        >
+          &times;
+        </button>
       </div>
-      <div class="flex-1 overflow-y-auto p-3 space-y-2">
-        <div v-for="ev in calendarMoreEventsModal.events" :key="ev.id"
+
+      <div class="app-modal-body flex-1 overflow-y-auto p-3 space-y-2">
+        <div
+          v-for="ev in calendarMoreEventsModal.events"
+          :key="ev.id"
           class="p-3 rounded-lg border cursor-pointer hover:shadow-md hover:border-blue-200 transition"
-          @click="onEventClickFromMoreModal(ev)">
+          @click="onEventClickFromMoreModal(ev)"
+        >
           <div class="flex items-center gap-2 mb-1">
-            <span class="w-3 h-3 rounded-full shrink-0" :class="assessmentDot(ev.type)"></span>
-            <span class="flex-1 font-semibold text-gray-800 truncate">{{ev.name}}</span>
-            <span class="text-xs px-1.5 py-0.5 rounded text-white" :class="assessmentColor(ev.type)">{{assessmentLabel(ev.type)}}</span>
+            <span
+              class="w-3 h-3 rounded-full shrink-0"
+              :class="assessmentDot(ev.type)"
+            ></span>
+
+            <span class="flex-1 font-semibold text-gray-800 truncate">
+              {{ev.name}}
+            </span>
+
+            <span
+              class="text-xs px-1.5 py-0.5 rounded text-white"
+              :class="assessmentColor(ev.type)"
+            >
+              {{assessmentLabel(ev.type)}}
+            </span>
           </div>
+
           <div class="text-xs text-gray-500 pl-5">
-            {{ev.className}}<span v-if="ev.subject"> - {{ev.subject}}</span> · {{ev.termName}} · 滿分 {{ev.fullMark}}
+            {{ev.className}}<span v-if="ev.subject"> - {{ev.subject}}</span>
+            · {{ev.termName}} · 滿分 {{ev.fullMark}}
           </div>
         </div>
       </div>
-      <div class="p-3 border-t bg-gray-50">
-        <button @click="openCalendarAddModal(calendarMoreEventsModal.date); calCloseMoreEventsModal()"
-          class="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
-          <i class="fas fa-plus mr-1"></i>新增項目
+
+      <div class="app-modal-foot p-3 border-t bg-gray-50">
+        <button
+          type="button"
+          @click="openCalendarAddModal(calendarMoreEventsModal.date); calCloseMoreEventsModal()"
+          class="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+        >
+          <i class="fas fa-plus mr-1" aria-hidden="true"></i>
+          新增項目
         </button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL -->
-  <div v-if="showModal" class="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-2 sm:p-4" @click.self="closeModal">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto" @keydown="onModalKeydown">
-      <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b">
-        <h3 class="text-base sm:text-lg font-bold text-gray-800">{{modalTitle}}</h3>
-        <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+<!-- MODAL -->
+  <div
+    v-if="showModal"
+    class="app-modal fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-2 sm:p-4"
+    @click.self="closeModal"
+  >
+    <div
+      class="app-modal-panel bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-screen overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="modalTitle"
+      @keydown="onModalKeydown"
+    >
+      <div
+        class="app-modal-head flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b"
+      >
+        <h3 class="text-base sm:text-lg font-bold text-gray-800">
+          {{modalTitle}}
+        </h3>
+
+        <button
+          type="button"
+          @click="closeModal"
+          class="text-gray-400 hover:text-gray-600 text-xl"
+          aria-label="關閉對話框"
+        >
+          &times;
+        </button>
       </div>
-      <div class="px-4 sm:px-6 py-3 sm:py-4 space-y-4">
+
+      <div class="app-modal-body px-4 sm:px-6 py-3 sm:py-4 space-y-4">
         <template v-if="modalType==='addYear'||modalType==='editYear'">
           <div><label class="block text-sm font-medium text-gray-700 mb-1">學年名稱</label><input v-model="modalData.name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none" placeholder="例：2024-2025"></div>
         </template>
@@ -1884,23 +2003,84 @@
           </div>
         </template>
       </div>
-      <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t bg-gray-50">
-        <button @click="closeModal" type="button" class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-        <button @click="confirmModal" type="button" class="px-4 py-2 text-sm text-white rounded-lg"
-          :class="(modalType==='deleteConfirm'||modalType==='profileDeleteConfirm') ? 'bg-red-500 hover:bg-red-600' : (modalType==='profileResetPwConfirm' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-500 hover:bg-blue-600')">
-          {{ (modalType==='deleteConfirm'||modalType==='profileDeleteConfirm') ? '確認刪除' : (modalType==='applyTemplateConfirm' ? '確認套用' : (modalType==='profileResetPwConfirm' ? '確認重設' : '確認')) }}
+<div
+        class="app-modal-foot flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t bg-gray-50"
+      >
+        <button
+          @click="closeModal"
+          type="button"
+          class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          取消
+        </button>
+
+        <button
+          @click="confirmModal"
+          type="button"
+          class="px-4 py-2 text-sm text-white rounded-lg"
+          :class="
+            (modalType === 'deleteConfirm' || modalType === 'profileDeleteConfirm')
+              ? 'bg-red-500 hover:bg-red-600'
+              : (
+                  modalType === 'profileResetPwConfirm'
+                    ? 'bg-amber-500 hover:bg-amber-600'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                )
+          "
+        >
+          {{
+            (modalType === 'deleteConfirm' || modalType === 'profileDeleteConfirm')
+              ? '確認刪除'
+              : (
+                  modalType === 'applyTemplateConfirm'
+                    ? '確認套用'
+                    : (
+                        modalType === 'profileResetPwConfirm'
+                          ? '確認重設'
+                          : '確認'
+                      )
+                )
+          }}
         </button>
       </div>
     </div>
   </div>
 
   <!-- MAIN APP -->
-  <div v-if="appState === 'app' && !loading" class="h-screen flex flex-col">
-    <header :style="headerStyle" class="app-header text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
+<div
+  v-if="appState === 'app' && !loading"
+  class="app-shell h-screen flex flex-col"
+  :class="[
+    'view-' + currentView,
+    { 'is-keyboard-open': mobileKeyboardOpen }
+  ]"
+>    <header :style="headerStyle" class="app-header text-white px-3 sm:px-4 py-2 flex items-center gap-2 sm:gap-3 shrink-0 shadow-md z-30">
       <button v-if="currentView!=='home' && currentView!=='settings'" @click="leftPanelOpen=!leftPanelOpen" class="p-1.5 rounded-lg hover:bg-white/20 transition"><i class="fas fa-bars"></i></button>
-      <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">{{settings.schoolName ? settings.schoolName : '成績管理系統'}}</h1>
+<div class="app-header-heading min-w-0">
+  <h1 class="font-bold text-base sm:text-lg tracking-wide truncate">
+    {{
+      mobileCompact
+        ? mobileHeaderTitle
+        : (settings.schoolName || '成績管理系統')
+    }}
+  </h1>
+
+  <p v-if="mobileCompact" class="app-header-subtitle">
+    {{mobileHeaderSubtitle}}
+  </p>
+</div>
       <div class="flex-1"></div>
-      <div v-if="currentAcademicYear" class="text-xs sm:text-sm opacity-90 hidden sm:block truncate max-w-xs"><span>{{currentAcademicYear.name}}</span><span v-if="currentClass"> / {{currentClass.className}}<span v-if="currentClass.subject"> - {{currentClass.subject}}</span></span></div>
+<div
+  v-if="currentAcademicYear"
+  class="app-header-desktop-context text-xs sm:text-sm opacity-90 hidden sm:block truncate max-w-xs"
+>
+  <span>{{currentAcademicYear.name}}</span>
+
+  <span v-if="currentClass">
+    / {{currentClass.className}}
+    <span v-if="currentClass.subject"> - {{currentClass.subject}}</span>
+  </span>
+</div>
 
       <!-- ★ v28: 頂部快速切換深色 / 淺色模式 -->
       <button @click="toggleDarkMode" class="p-1.5 rounded-lg hover:bg-white/20 transition shrink-0" :title="darkMode ? '切換至淺色模式' : '切換至深色模式'">
@@ -1936,13 +2116,46 @@
         </transition>
       </div>
     </header>
-    <nav class="app-nav bg-white border-b shrink-0 flex overflow-x-auto">
-      <button v-for="tab in orderedTabs" :key="tab.key" @click="switchToTab(tab.key)" class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition" :class="currentView===tab.key?'':'border-transparent text-gray-500 hover:text-gray-700'" :style="currentView===tab.key?activeTabStyle:{}">
-        <i :class="tab.icon" class="text-xs"></i><span>{{tab.label}}</span>
-      </button>
-    </nav>
-    <div class="flex flex-1 min-h-0 relative">
-      <transition name="overlay-fade">
+<nav
+  class="app-nav bg-white border-b shrink-0 flex overflow-x-auto"
+  aria-label="主要導覽"
+>
+  <button
+    v-for="tab in orderedTabs"
+    :key="tab.key"
+    type="button"
+    @click="switchToTab(tab.key)"
+    class="app-tab flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition"
+    :class="
+      currentView === tab.key
+        ? 'is-active'
+        : 'border-transparent text-gray-500 hover:text-gray-700'
+    "
+    :style="
+      !mobileCompact && currentView === tab.key
+        ? activeTabStyle
+        : {}
+    "
+    :aria-current="currentView === tab.key ? 'page' : null"
+  >
+    <span class="app-tab-icon" aria-hidden="true">
+      <i :class="tab.icon" class="text-xs"></i>
+    </span>
+
+    <span class="app-tab-label">{{tab.label}}</span>
+  </button>
+</nav>
+
+<!-- 手機操作選單的背景遮罩 -->
+<div
+  v-if="mobileMenusOpen"
+  class="mobile-menu-backdrop"
+  aria-hidden="true"
+  @click.stop="mobileCloseMenus()"
+></div>
+
+<div class="app-workspace flex flex-1 min-h-0 relative">
+        <transition name="overlay-fade">
         <div v-if="leftPanelOpen && currentView !== 'home' && currentView !== 'settings'" @click="leftPanelOpen=false" @touchmove.prevent class="absolute inset-0 bg-black/30 z-10 lg:hidden mobile-overlay"></div>
       </transition>
       <transition name="sidebar-slide">
@@ -2088,37 +2301,95 @@
               </div>
             </div>
 
-            <div v-else>
-              <div class="grid grid-cols-7 gap-1">
-                <div v-for="(d, di) in calendarWeekDays" :key="di"
+<div v-else class="app-calendar-week-scroll">
+              <div class="app-calendar-week-grid grid grid-cols-7 gap-1">
+                <div
+                  v-for="(d, di) in calendarWeekDays"
+                  :key="di"
                   class="cal-week-day rounded-lg border"
-                  :class="isToday(d) ? 'cal-week-today' : 'bg-white border-gray-200'">
-                  <div class="flex items-center justify-between p-2 border-b"
-                    :class="isToday(d) ? 'cal-week-today-head' : 'border-gray-100 bg-gray-50'">
+                  :class="
+                    isToday(d)
+                      ? 'cal-week-today'
+                      : 'bg-white border-gray-200'
+                  "
+                >
+                  <div
+                    class="flex items-center justify-between p-2 border-b"
+                    :class="
+                      isToday(d)
+                        ? 'cal-week-today-head'
+                        : 'border-gray-100 bg-gray-50'
+                    "
+                  >
                     <div>
-                      <div class="text-xs" :class="isToday(d) ? 'cal-week-today-label font-semibold' : 'text-gray-500'">週{{dayNames[d.getDay()]}}</div>
-                      <div class="text-lg font-bold" :class="isToday(d) ? 'cal-week-today-num' : 'text-gray-700'">{{d.getDate()}}</div>
+                      <div
+                        class="text-xs"
+                        :class="
+                          isToday(d)
+                            ? 'cal-week-today-label font-semibold'
+                            : 'text-gray-500'
+                        "
+                      >
+                        週{{dayNames[d.getDay()]}}
+                      </div>
+
+                      <div
+                        class="text-lg font-bold"
+                        :class="
+                          isToday(d)
+                            ? 'cal-week-today-num'
+                            : 'text-gray-700'
+                        "
+                      >
+                        {{d.getDate()}}
+                      </div>
                     </div>
-                    <button @click="openCalendarAddModal(d)"
-                      class="text-gray-400 hover:text-blue-500 p-1.5 rounded hover:bg-white transition" title="新增項目">
-                      <i class="fas fa-plus text-xs"></i>
+
+                    <button
+                      type="button"
+                      @click="openCalendarAddModal(d)"
+                      class="text-gray-400 hover:text-blue-500 p-1.5 rounded hover:bg-white transition"
+                      title="新增項目"
+                      aria-label="新增當日項目"
+                    >
+                      <i class="fas fa-plus text-xs" aria-hidden="true"></i>
                     </button>
                   </div>
+
                   <div class="flex-1 overflow-y-auto p-1.5 space-y-1">
-                    <div v-for="ev in getEventsForDate(d)" :key="ev.id"
+                    <div
+                      v-for="ev in getEventsForDate(d)"
+                      :key="ev.id"
                       class="cal-event p-1.5 rounded text-white shadow-sm"
                       :class="assessmentColor(ev.type)"
-                      @click="onEventClick(ev, $event)">
-                      <div class="text-xs font-semibold truncate leading-tight">{{ev.name}}</div>
-                      <div class="text-xs opacity-90 truncate mt-0.5 leading-tight">{{ev.className}}<span v-if="ev.subject"> - {{ev.subject}}</span></div>
-                      <div class="text-xs opacity-75 mt-0.5 flex items-center justify-between gap-1">
+                      @click="onEventClick(ev, $event)"
+                    >
+                      <div class="text-xs font-semibold truncate leading-tight">
+                        {{ev.name}}
+                      </div>
+
+                      <div class="text-xs opacity-90 truncate mt-0.5 leading-tight">
+                        {{ev.className}}<span v-if="ev.subject"> - {{ev.subject}}</span>
+                      </div>
+
+                      <div
+                        class="text-xs opacity-75 mt-0.5 flex items-center justify-between gap-1"
+                      >
                         <span>滿分 {{ev.fullMark}}</span>
-                        <span class="bg-white/20 px-1 rounded text-xs" style="font-size:9px">
+
+                        <span
+                          class="bg-white/20 px-1 rounded text-xs"
+                          style="font-size:9px"
+                        >
                           {{calEventProgress(ev).entered}}/{{calEventProgress(ev).total}}
                         </span>
                       </div>
                     </div>
-                    <div v-if="getEventsForDate(d).length === 0" class="text-xs text-gray-300 text-center pt-4 italic">
+
+                    <div
+                      v-if="getEventsForDate(d).length === 0"
+                      class="text-xs text-gray-300 text-center pt-4 italic"
+                    >
                       無項目
                     </div>
                   </div>
@@ -2146,99 +2417,347 @@
         <div v-if="currentView==='grades'" class="h-full flex flex-col">
           <div v-if="!currentClass" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-hand-point-left text-4xl mb-3"></i><p>請先從左側選擇學年和班別</p></div></div>
           <template v-else>
-            <div class="shrink-0 bg-white border-b px-2 sm:px-4 py-2">
-              <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
-                <button v-for="term in currentClass.terms" :key="term.id" @click="gradesSelectTerm(term.id)" class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition" :class="gradesTermId===term.id?'term-btn-active font-semibold':'border-gray-200 text-gray-500 hover:bg-gray-50'">{{term.name}}</button>
+<div
+              class="grades-toolbar shrink-0 bg-white border-b px-2 sm:px-4 py-2"
+            >
+              <div
+                class="grades-toolbar-top flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2"
+              >
+                <button
+                  v-for="term in currentClass.terms"
+                  :key="term.id"
+                  type="button"
+                  @click="gradesSelectTerm(term.id)"
+                  class="px-2.5 sm:px-3 py-1 text-xs sm:text-sm rounded-lg border transition"
+                  :class="
+                    gradesTermId === term.id
+                      ? 'term-btn-active font-semibold'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  "
+                >
+                  {{term.name}}
+                </button>
 
                 <div class="flex-1"></div>
 
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs text-gray-500 hidden sm:inline">顯示：</span>
-                  <div class="seg-track" style="grid-template-columns: repeat(3, 1fr); min-width: 180px; height: 28px;">
-                    <div class="seg-thumb-wrap"
-                      :style="{width: 'calc((100% - 4px) / 3)', transform: 'translateX(' + (gradesDisplayModeIdx * 100) + '%)'}">
+                  <span class="text-xs text-gray-500 hidden sm:inline">
+                    顯示：
+                  </span>
+
+                  <div
+                    class="seg-track"
+                    style="grid-template-columns:repeat(3,1fr);min-width:180px;height:28px"
+                  >
+                    <div
+                      class="seg-thumb-wrap"
+                      :style="{
+                        width: 'calc((100% - 4px) / 3)',
+                        transform: 'translateX(' + (gradesDisplayModeIdx * 100) + '%)'
+                      }"
+                    >
                       <div class="seg-thumb-pill"></div>
                     </div>
-                    <button type="button" class="seg-option"
+
+                    <button
+                      type="button"
+                      class="seg-option"
                       :class="{'seg-active': gradesDisplayMode === 'raw'}"
-                      @click="gradesSetDisplayMode('raw')" title="顯示真實分數">分數</button>
-                    <button type="button" class="seg-option"
+                      @click="gradesSetDisplayMode('raw')"
+                      title="顯示真實分數"
+                    >
+                      分數
+                    </button>
+
+                    <button
+                      type="button"
+                      class="seg-option"
                       :class="{'seg-active': gradesDisplayMode === 'percent'}"
-                      @click="gradesSetDisplayMode('percent')" title="顯示百分比">百分比</button>
-                    <button type="button" class="seg-option"
+                      @click="gradesSetDisplayMode('percent')"
+                      title="顯示百分比"
+                    >
+                      百分比
+                    </button>
+
+                    <button
+                      type="button"
+                      class="seg-option"
                       :class="{'seg-active': gradesDisplayMode === 'rank'}"
-                      @click="gradesSetDisplayMode('rank')" title="顯示班內排名">排名</button>
+                      @click="gradesSetDisplayMode('rank')"
+                      title="顯示班內排名"
+                    >
+                      排名
+                    </button>
                   </div>
                 </div>
               </div>
-              <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <!-- ★ 新增項目按鈕群 -->
-                <span class="text-xs text-gray-400 font-semibold hidden sm:inline mr-0.5"><i class="fas fa-plus-circle mr-0.5"></i>新增</span>
-                <button @click="openAddAssessmentModal('assignment')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition"><i class="fas fa-plus mr-1"></i>課業</button>
-                <button @click="openAddAssessmentModal('quiz')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 transition"><i class="fas fa-plus mr-1"></i>小測</button>
-                <div class="relative">
-                  <button @click.stop="gradesCPMenuOpen=!gradesCPMenuOpen" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 transition"><i class="fas fa-plus mr-1"></i>課堂表現 <i class="fas fa-caret-down ml-0.5"></i></button>
-                  <div v-if="gradesCPMenuOpen" class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-40">
-                    <button @click="openAddAssessmentModal('class_performance','ut');gradesCPMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50">統測期課堂表現</button>
-                    <button @click="openAddAssessmentModal('class_performance','exam');gradesCPMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50">考試期課堂表現</button>
-                  </div>
-                </div>
-                <button v-if="!gradesHasUT" @click="openAddAssessmentModal('unified_test')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 transition"><i class="fas fa-plus mr-1"></i>統測</button>
-                <button v-if="!gradesHasExam" @click="openAddAssessmentModal('exam')" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition"><i class="fas fa-plus mr-1"></i>考試</button>
+
+              <div
+                class="grades-toolbar-actions flex flex-wrap items-center gap-1.5 sm:gap-2"
+              >
+                <span
+                  class="text-xs text-gray-400 font-semibold hidden sm:inline mr-0.5"
+                >
+                  <i class="fas fa-plus-circle mr-0.5" aria-hidden="true"></i>
+                  新增
+                </span>
+
+                <button
+                  type="button"
+                  @click="openAddAssessmentModal('assignment')"
+                  class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition"
+                >
+                  <i class="fas fa-plus mr-1" aria-hidden="true"></i>課業
+                </button>
+
+                <button
+                  type="button"
+                  @click="openAddAssessmentModal('quiz')"
+                  class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 transition"
+                >
+                  <i class="fas fa-plus mr-1" aria-hidden="true"></i>小測
+                </button>
 
                 <div class="relative">
-                  <button @click.stop="gradesCustomMenuOpen=!gradesCustomMenuOpen" class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 transition"><i class="fas fa-plus mr-1"></i>自訂類別 <i class="fas fa-caret-down ml-0.5"></i></button>
-                  <div v-if="gradesCustomMenuOpen" class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-64" @click.stop>
-                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b bg-gray-50">自訂類別管理</div>
-                    <div v-if="!currentClass.customCategories || currentClass.customCategories.length===0" class="px-3 py-3 text-xs text-gray-400 italic text-center">尚無自訂類別</div>
+                  <button
+                    type="button"
+                    @click.stop="gradesCPMenuOpen = !gradesCPMenuOpen"
+                    class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 transition"
+                  >
+                    <i class="fas fa-plus mr-1" aria-hidden="true"></i>
+                    課堂表現
+                    <i class="fas fa-caret-down ml-0.5" aria-hidden="true"></i>
+                  </button>
+
+                  <div
+                    v-if="gradesCPMenuOpen"
+                    class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-40"
+                    @click.stop
+                  >
+                    <button
+                      type="button"
+                      @click="openAddAssessmentModal('class_performance', 'ut'); gradesCPMenuOpen = false"
+                      class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                    >
+                      統測期課堂表現
+                    </button>
+
+                    <button
+                      type="button"
+                      @click="openAddAssessmentModal('class_performance', 'exam'); gradesCPMenuOpen = false"
+                      class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
+                    >
+                      考試期課堂表現
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  v-if="!gradesHasUT"
+                  type="button"
+                  @click="openAddAssessmentModal('unified_test')"
+                  class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 transition"
+                >
+                  <i class="fas fa-plus mr-1" aria-hidden="true"></i>統測
+                </button>
+
+                <button
+                  v-if="!gradesHasExam"
+                  type="button"
+                  @click="openAddAssessmentModal('exam')"
+                  class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition"
+                >
+                  <i class="fas fa-plus mr-1" aria-hidden="true"></i>考試
+                </button>
+
+                <div class="relative">
+                  <button
+                    type="button"
+                    @click.stop="gradesCustomMenuOpen = !gradesCustomMenuOpen"
+                    class="px-2 sm:px-2.5 py-1 text-xs rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 transition"
+                  >
+                    <i class="fas fa-plus mr-1" aria-hidden="true"></i>
+                    自訂類別
+                    <i class="fas fa-caret-down ml-0.5" aria-hidden="true"></i>
+                  </button>
+
+                  <div
+                    v-if="gradesCustomMenuOpen"
+                    class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-64"
+                    @click.stop
+                  >
+                    <div
+                      class="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b bg-gray-50"
+                    >
+                      自訂類別管理
+                    </div>
+
+                    <div
+                      v-if="!currentClass.customCategories || currentClass.customCategories.length === 0"
+                      class="px-3 py-3 text-xs text-gray-400 italic text-center"
+                    >
+                      尚無自訂類別
+                    </div>
+
                     <div v-else>
-                      <div v-for="cat in (currentClass.customCategories||[])" :key="cat.id" class="custom-cat-row">
-                        <button @click="openAddAssessmentModal('custom',null,cat.id);gradesCustomMenuOpen=false" class="custom-cat-select-btn" :title="'新增「'+cat.name+'」項目'">
-                          <span class="inline-block w-3 h-3 rounded shrink-0" :style="{backgroundColor:getCustomCategoryColor(cat.colorKey).tagBg}"></span>
+                      <div
+                        v-for="cat in (currentClass.customCategories || [])"
+                        :key="cat.id"
+                        class="custom-cat-row"
+                      >
+                        <button
+                          type="button"
+                          @click="openAddAssessmentModal('custom', null, cat.id); gradesCustomMenuOpen = false"
+                          class="custom-cat-select-btn"
+                          :title="'新增「' + cat.name + '」項目'"
+                        >
+                          <span
+                            class="inline-block w-3 h-3 rounded shrink-0"
+                            :style="{
+                              backgroundColor: getCustomCategoryColor(cat.colorKey).tagBg
+                            }"
+                          ></span>
+
                           <span class="text-gray-700">{{cat.name}}</span>
                         </button>
-                        <button @click.stop="confirmDeleteCustomCategory(cat);gradesCustomMenuOpen=false" class="custom-cat-delete-btn" :title="'刪除類別「'+cat.name+'」'">
-                          <i class="fas fa-trash text-xs"></i>
+
+                        <button
+                          type="button"
+                          @click.stop="confirmDeleteCustomCategory(cat); gradesCustomMenuOpen = false"
+                          class="custom-cat-delete-btn"
+                          :title="'刪除類別「' + cat.name + '」'"
+                          :aria-label="'刪除類別「' + cat.name + '」'"
+                        >
+                          <i class="fas fa-trash text-xs" aria-hidden="true"></i>
                         </button>
                       </div>
                     </div>
+
                     <div class="border-t mt-1 pt-1">
-                      <button @click="openAddCustomCategoryModal();gradesCustomMenuOpen=false" class="w-full text-left px-3 py-1.5 text-xs text-teal-600 hover:bg-teal-50"><i class="fas fa-plus mr-1"></i>新增類別...</button>
+                      <button
+                        type="button"
+                        @click="openAddCustomCategoryModal(); gradesCustomMenuOpen = false"
+                        class="w-full text-left px-3 py-1.5 text-xs text-teal-600 hover:bg-teal-50"
+                      >
+                        <i class="fas fa-plus mr-1" aria-hidden="true"></i>
+                        新增類別...
+                      </button>
                     </div>
                   </div>
                 </div>
 
                 <div class="w-px h-5 bg-gray-200 mx-0.5"></div>
 
-                <!-- ★ v18: 匯出按鈕（與新增按鈕區隔的獨立樣式：深色實心 + 下拉選單） -->
                 <div class="relative">
-                  <button @click.stop="gradesExportMenuOpen=!gradesExportMenuOpen"
+                  <button
+                    type="button"
+                    @click.stop="gradesExportMenuOpen = !gradesExportMenuOpen"
                     class="px-2.5 sm:px-3 py-1 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 shadow-sm transition flex items-center gap-1"
-                    title="匯出此學期成績">
-                    <i class="fas fa-download"></i>
+                    title="匯出此學期成績"
+                  >
+                    <i class="fas fa-download" aria-hidden="true"></i>
                     <span>匯出</span>
-                    <i class="fas fa-caret-down ml-0.5"></i>
+                    <i class="fas fa-caret-down ml-0.5" aria-hidden="true"></i>
                   </button>
-                  <div v-if="gradesExportMenuOpen" class="absolute top-full mt-1 right-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-44" @click.stop>
-                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-400 border-b">選擇匯出格式</div>
-                    <button @click="exportGradesExcel" class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700">
-                      <i class="fas fa-file-excel text-emerald-600 w-4"></i><span>Excel（含格式）</span>
+
+                  <div
+                    v-if="gradesExportMenuOpen"
+                    class="absolute top-full mt-1 right-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-44"
+                    @click.stop
+                  >
+                    <div
+                      class="px-3 py-1.5 text-xs font-semibold text-gray-400 border-b"
+                    >
+                      選擇匯出格式
+                    </div>
+
+                    <button
+                      type="button"
+                      @click="exportGradesExcel"
+                      class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center gap-2 text-gray-700"
+                    >
+                      <i class="fas fa-file-excel text-emerald-600 w-4" aria-hidden="true"></i>
+                      <span>Excel（含格式）</span>
                     </button>
-                    <button @click="exportGradesPDF" class="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700">
-                      <i class="fas fa-file-pdf text-red-600 w-4"></i><span>PDF（含格式）</span>
+
+                    <button
+                      type="button"
+                      @click="exportGradesPDF"
+                      class="w-full text-left px-3 py-2 text-xs hover:bg-red-50 flex items-center gap-2 text-gray-700"
+                    >
+                      <i class="fas fa-file-pdf text-red-600 w-4" aria-hidden="true"></i>
+                      <span>PDF（含格式）</span>
                     </button>
-                    <button @click="exportCSV" class="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700">
-                      <i class="fas fa-file-csv text-blue-600 w-4"></i><span>CSV（純文字）</span>
+
+                    <button
+                      type="button"
+                      @click="exportCSV"
+                      class="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center gap-2 text-gray-700"
+                    >
+                      <i class="fas fa-file-csv text-blue-600 w-4" aria-hidden="true"></i>
+                      <span>CSV（純文字）</span>
                     </button>
                   </div>
                 </div>
 
-                <span v-if="Object.keys(gradesSavingCells).length>0" class="text-xs text-gray-400 ml-1 sm:ml-2"><i class="fas fa-circle-notch fa-spin mr-1"></i>儲存中...</span>
+                <span
+                  v-if="Object.keys(gradesSavingCells).length > 0"
+                  class="text-xs text-gray-400 ml-1 sm:ml-2"
+                >
+                  <i class="fas fa-circle-notch fa-spin mr-1" aria-hidden="true"></i>
+                  儲存中...
+                </span>
+
                 <div class="flex-1"></div>
-                <label class="flex items-center gap-1 sm:gap-1.5 cursor-pointer select-none text-sm"><input type="checkbox" v-model="gradesShowFailHighlight" class="rounded border-gray-300 text-red-500 focus:ring-red-300"><span class="text-gray-600 text-xs hidden sm:inline">標示不合格</span><span class="text-gray-600 text-xs sm:hidden">不合格</span></label>
-                <div v-if="gradesShowFailHighlight" class="flex items-center gap-1 text-xs text-gray-500"><span class="hidden sm:inline">不合格線</span><input type="number" inputmode="numeric" :value="gradesFailPercent!==null?gradesFailPercent:''" :placeholder="gradesAutoFailPercent+'%'" @input="gradesSetFailPercent($event.target.value===''?null:$event.target.value)" class="w-10 sm:w-12 border border-gray-300 rounded px-1 py-0.5 text-center text-xs" min="0" max="100"><span>%</span><span v-if="gradesFailPercent===null" class="text-gray-400 hidden sm:inline">(自動)</span></div>
+
+                <label
+                  class="flex items-center gap-1 sm:gap-1.5 cursor-pointer select-none text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    v-model="gradesShowFailHighlight"
+                    class="rounded border-gray-300 text-red-500 focus:ring-red-300"
+                  >
+
+                  <span class="text-gray-600 text-xs hidden sm:inline">
+                    標示不合格
+                  </span>
+
+                  <span class="text-gray-600 text-xs sm:hidden">
+                    不合格
+                  </span>
+                </label>
+
+                <div
+                  v-if="gradesShowFailHighlight"
+                  class="flex items-center gap-1 text-xs text-gray-500"
+                >
+                  <span class="hidden sm:inline">不合格線</span>
+
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    :value="gradesFailPercent !== null ? gradesFailPercent : ''"
+                    :placeholder="gradesAutoFailPercent + '%'"
+                    @input="gradesSetFailPercent($event.target.value === '' ? null : $event.target.value)"
+                    class="w-10 sm:w-12 border border-gray-300 rounded px-1 py-0.5 text-center text-xs"
+                    min="0"
+                    max="100"
+                    aria-label="不合格百分比"
+                  >
+
+                  <span>%</span>
+
+                  <span
+                    v-if="gradesFailPercent === null"
+                    class="text-gray-400 hidden sm:inline"
+                  >
+                    (自動)
+                  </span>
+                </div>
               </div>
             </div>
+
             <div v-if="gradesOrderedAssessments.length===0" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p class="font-medium">尚未新增評估項目</p><p class="text-sm mt-1">請使用上方按鈕新增課業、小測或考試</p></div></div>
 
             <div v-else class="flex-1 min-h-0 grades-scroll-container" :class="{'is-dragging': gradesIsDragging}" ref="gradesWrapper" tabindex="-1" @keydown="gradesHandleKeydown" @copy="gradesHandleCopy" @paste="gradesHandlePaste" @click.self="gradesDeselect">
@@ -2351,8 +2870,21 @@
                 </tbody>
               </table>
             </div>
-            <div v-if="gradesDetailPanel&&gradesDetailAssessment" :style="gradesDetailPanelStyle" class="detail-panel" @click.stop @mousedown.stop>
-              <div class="px-4 py-3 border-b flex items-center gap-2" :style="gradesAssessmentHeaderStyle(gradesDetailPanel.idx)">
+<div
+              v-if="mobileCompact && gradesDetailPanel && gradesDetailAssessment"
+              class="mobile-detail-backdrop"
+              @click.stop="gradesCloseDetailPanel"
+              aria-hidden="true"
+            ></div>
+
+            <div
+              v-if="gradesDetailPanel && gradesDetailAssessment"
+              :style="gradesDetailPanelStyle"
+              class="detail-panel"
+              @click.stop
+              @mousedown.stop
+            >
+                          <div class="px-4 py-3 border-b flex items-center gap-2" :style="gradesAssessmentHeaderStyle(gradesDetailPanel.idx)">
                 <div class="flex-1"><div class="font-bold text-sm">{{gradesDetailAssessment.name}}</div><div class="text-xs opacity-70">{{assessmentLabel(gradesDetailAssessment.type)}}</div></div>
                 <button @click="gradesCloseDetailPanel" class="p-1 rounded hover:bg-black/10 text-lg leading-none">&times;</button>
               </div>
@@ -2393,10 +2925,22 @@
                 <button @click="gradesDeleteAssessmentFromDetail" class="flex-1 px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"><i class="fas fa-trash mr-1"></i>刪除</button>
               </div>
             </div>
-            <div class="shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between text-xs text-gray-400">
-              <span>共 {{gradesSortedStudents.length}} 位學生 · {{gradesOrderedAssessments.length}} 個項目</span>
-              <span v-if="gradesIsTouchDevice" class="sm:inline">輕觸預覽，再次輕觸進入編輯</span>
-              <span v-else class="hidden sm:inline">小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼 · 方向鍵移動 · F2 微調 · Ctrl+Z 復原</span>
+            <div
+              class="grades-statusbar shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between text-xs text-gray-400"
+            >
+              <span>
+                共 {{gradesSortedStudents.length}} 位學生
+                · {{gradesOrderedAssessments.length}} 個項目
+              </span>
+
+              <span v-if="gradesIsTouchDevice" class="sm:inline">
+                輕觸預覽，再次輕觸進入編輯
+              </span>
+
+              <span v-else class="hidden sm:inline">
+                小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼
+                · 方向鍵移動 · F2 微調 · Ctrl+Z 復原
+              </span>
             </div>
           </template>
         </div>
@@ -3526,68 +4070,258 @@
     </div>
   </div>
 
-  <div v-if="settingsCurrentView==='students'">
+<div v-if="settingsCurrentView === 'students'">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
       <div class="min-w-0 flex-1">
         <h2 class="text-base sm:text-lg font-bold text-gray-800 truncate">
-          {{settingsClass?settingsClass.className+(settingsClass.subject?' - '+settingsClass.subject:''):''}} — 學生管理
+          {{
+            settingsClass
+              ? settingsClass.className +
+                (settingsClass.subject ? ' - ' + settingsClass.subject : '')
+              : ''
+          }}
+          — 學生管理
         </h2>
-        <div v-if="settingsClass && settingsClass.classType === 'regular' && classSubjectsCount(settingsClass) > 0" class="text-xs text-blue-600 mt-1">
-          <i class="fas fa-link mr-1"></i>此班別已連結 {{classSubjectsCount(settingsClass)}} 個科目，新增/修改/刪除學生將同步至所有科目。
+
+        <div
+          v-if="settingsClass && settingsClass.classType === 'regular' && classSubjectsCount(settingsClass) > 0"
+          class="text-xs text-blue-600 mt-1"
+        >
+          <i class="fas fa-link mr-1" aria-hidden="true"></i>
+          此班別已連結 {{classSubjectsCount(settingsClass)}} 個科目，
+          新增/修改/刪除學生將同步至所有科目。
         </div>
-        <div v-else-if="settingsClass && settingsClass.classType === 'subject'" class="text-xs text-blue-600 mt-1">
-          <i class="fas fa-link mr-1"></i>此科目連結至「{{settingsClass.className}}」班別，學生名單會同步。
+
+        <div
+          v-else-if="settingsClass && settingsClass.classType === 'subject'"
+          class="text-xs text-blue-600 mt-1"
+        >
+          <i class="fas fa-link mr-1" aria-hidden="true"></i>
+          此科目連結至「{{settingsClass.className}}」班別，學生名單會同步。
         </div>
-        <div v-else-if="settingsClass && settingsClass.classType === 'elective'" class="text-xs text-purple-600 mt-1">
-          <i class="fas fa-star mr-1"></i>選修科：學生獨立管理，不與其他班別同步。列表按班別、學號排序。
+
+        <div
+          v-else-if="settingsClass && settingsClass.classType === 'elective'"
+          class="text-xs text-purple-600 mt-1"
+        >
+          <i class="fas fa-star mr-1" aria-hidden="true"></i>
+          選修科：學生獨立管理，不與其他班別同步。列表按班別、學號排序。
         </div>
-        <div v-else-if="settingsClass && settingsClass.classType === 'regular'" class="text-xs text-amber-600 mt-1">
-          <i class="fas fa-users mr-1"></i>一般班別：只含學生名單。前往「科目管理」可為此班別新增科目。
+
+        <div
+          v-else-if="settingsClass && settingsClass.classType === 'regular'"
+          class="text-xs text-amber-600 mt-1"
+        >
+          <i class="fas fa-users mr-1" aria-hidden="true"></i>
+          一般班別：只含學生名單。前往「科目管理」可為此班別新增科目。
         </div>
       </div>
+
       <div class="flex gap-2">
-        <button @click="openModal('batchImport',{text:'',parseError:null,yearId:settingsCurrentYearId,classId:settingsCurrentClassId})" class="px-3 py-1.5 text-xs sm:text-sm bg-green-500 text-white rounded-lg hover:bg-green-600"><i class="fas fa-file-import mr-1"></i>批量匯入</button>
-        <button @click="openModal('addStudent',{studentNumber:'',studentName:'',yearId:settingsCurrentYearId,classId:settingsCurrentClassId})" class="px-3 py-1.5 text-xs sm:text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"><i class="fas fa-plus mr-1"></i>新增學生</button>
+        <button
+          type="button"
+          @click="openModal('batchImport', {
+            text: '',
+            parseError: null,
+            yearId: settingsCurrentYearId,
+            classId: settingsCurrentClassId
+          })"
+          class="px-3 py-1.5 text-xs sm:text-sm bg-green-500 text-white rounded-lg hover:bg-green-600"
+        >
+          <i class="fas fa-file-import mr-1" aria-hidden="true"></i>
+          批量匯入
+        </button>
+
+        <button
+          type="button"
+          @click="openModal('addStudent', {
+            studentNumber: '',
+            studentName: '',
+            yearId: settingsCurrentYearId,
+            classId: settingsCurrentClassId
+          })"
+          class="px-3 py-1.5 text-xs sm:text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+        >
+          <i class="fas fa-plus mr-1" aria-hidden="true"></i>
+          新增學生
+        </button>
       </div>
     </div>
-    <div class="bg-white rounded-xl shadow overflow-hidden overflow-x-auto">
-      <table class="w-full text-sm" style="min-width:480px">
+
+    <div
+      class="mobile-student-container bg-white rounded-xl shadow overflow-hidden overflow-x-auto"
+    >
+      <table
+        class="mobile-student-list w-full text-sm"
+        style="min-width:480px"
+      >
         <thead class="bg-gray-50">
           <tr>
-            <th v-if="isSettingsClassElective" class="text-left px-3 sm:px-4 py-2 select-none">班別</th>
-            <th @click="isSettingsClassElective?null:sortStudents('studentNumber')" class="text-left px-3 sm:px-4 py-2 select-none" :class="isSettingsClassElective?'':'cursor-pointer hover:bg-gray-100'">學號 <i v-if="!isSettingsClassElective" class="fas fa-sort text-gray-300 ml-1"></i></th>
-            <th @click="isSettingsClassElective?null:sortStudents('studentName')" class="text-left px-3 sm:px-4 py-2 select-none" :class="isSettingsClassElective?'':'cursor-pointer hover:bg-gray-100'">姓名 <i v-if="!isSettingsClassElective" class="fas fa-sort text-gray-300 ml-1"></i></th>
-            <!-- ★ req3: 匹配狀態欄只在科目 / 選修班別顯示 -->
-            <th v-if="isSettingsClassMatchable" class="text-center px-3 sm:px-4 py-2 whitespace-nowrap">匹配狀態</th>
-            <th class="text-center px-3 sm:px-4 py-2 w-32">操作</th>
+            <th
+              v-if="isSettingsClassElective"
+              class="text-left px-3 sm:px-4 py-2 select-none"
+            >
+              班別
+            </th>
+
+            <th
+              @click="isSettingsClassElective ? null : sortStudents('studentNumber')"
+              class="text-left px-3 sm:px-4 py-2 select-none"
+              :class="
+                isSettingsClassElective
+                  ? ''
+                  : 'cursor-pointer hover:bg-gray-100'
+              "
+            >
+              學號
+
+              <i
+                v-if="!isSettingsClassElective"
+                class="fas fa-sort text-gray-300 ml-1"
+                aria-hidden="true"
+              ></i>
+            </th>
+
+            <th
+              @click="isSettingsClassElective ? null : sortStudents('studentName')"
+              class="text-left px-3 sm:px-4 py-2 select-none"
+              :class="
+                isSettingsClassElective
+                  ? ''
+                  : 'cursor-pointer hover:bg-gray-100'
+              "
+            >
+              姓名
+
+              <i
+                v-if="!isSettingsClassElective"
+                class="fas fa-sort text-gray-300 ml-1"
+                aria-hidden="true"
+              ></i>
+            </th>
+
+            <th
+              v-if="isSettingsClassMatchable"
+              class="text-center px-3 sm:px-4 py-2 whitespace-nowrap"
+            >
+              匹配狀態
+            </th>
+
+            <th class="text-center px-3 sm:px-4 py-2 w-32">
+              操作
+            </th>
           </tr>
         </thead>
+
         <tbody>
-          <tr v-for="s in settingsSortedStudents" :key="s.id" class="border-t hover:bg-gray-50">
-            <td v-if="isSettingsClassElective" class="px-3 sm:px-4 py-2 text-gray-600">{{getSettingsStudentOriginClass(s)}}</td>
-            <td class="px-3 sm:px-4 py-2">{{s.studentNumber}}</td>
-            <td class="px-3 sm:px-4 py-2">{{s.studentName}}</td>
-<!-- ★ req2+req3: 匹配狀態徽章（僅科目/選修顯示；新學生不顯示 hover tooltip） -->
-<td v-if="isSettingsClassMatchable" class="px-3 sm:px-4 py-2 text-center">
-<span class="match-status-badge"
-:class="[getMatchStatusBadgeClass(getStudentMatchStatus(s)), getStudentMatchStatus(s).type==='new' ? 'tip-off' : 'tip-on']"
-@mouseenter="getStudentMatchStatus(s).type!=='new' && showMatchTooltip(s, $event)"
-@mousemove="getStudentMatchStatus(s).type!=='new' && moveMatchTooltip($event)"
-@mouseleave="hideMatchTooltip">
-<i class="fas" :class="getStudentMatchStatus(s).icon"></i>
-{{getStudentMatchStatus(s).label}}
-</span>
-</td>
-            <td class="px-3 sm:px-4 py-2 text-center whitespace-nowrap">
-              <!-- ★ req3: 修改匹配按鈕只在科目 / 選修班別顯示 -->
-              <button v-if="isSettingsClassMatchable" @click="openEditStudentMatchModal(s)" class="text-gray-400 hover:text-purple-500 mr-2" title="修改匹配"><i class="fas fa-link"></i></button>
-              <button @click="openModal('editStudent',{id:s.id,studentNumber:s.studentNumber,studentName:s.studentName,yearId:settingsCurrentYearId,classId:settingsCurrentClassId})" class="text-gray-400 hover:text-blue-500 mr-2" title="編輯"><i class="fas fa-edit"></i></button>
-              <button @click="openModal('deleteConfirm',{target:'student',id:s.id,yearId:settingsCurrentYearId,classId:settingsCurrentClassId,message:'確定要刪除學生「'+s.studentName+'」嗎？'})" class="text-gray-400 hover:text-red-500" title="刪除"><i class="fas fa-trash"></i></button>
+          <tr
+            v-for="s in settingsSortedStudents"
+            :key="s.id"
+            class="border-t hover:bg-gray-50"
+          >
+            <td
+              v-if="isSettingsClassElective"
+              class="mobile-student-class px-3 sm:px-4 py-2 text-gray-600"
+            >
+              {{getSettingsStudentOriginClass(s)}}
+            </td>
+
+            <td class="mobile-student-number px-3 sm:px-4 py-2">
+              {{s.studentNumber}}
+            </td>
+
+            <td class="mobile-student-name px-3 sm:px-4 py-2">
+              {{s.studentName}}
+            </td>
+
+            <td
+              v-if="isSettingsClassMatchable"
+              class="mobile-student-match px-3 sm:px-4 py-2 text-center"
+            >
+              <span
+                class="match-status-badge"
+                :class="[
+                  getMatchStatusBadgeClass(getStudentMatchStatus(s)),
+                  getStudentMatchStatus(s).type === 'new'
+                    ? 'tip-off'
+                    : 'tip-on'
+                ]"
+                @mouseenter="
+                  getStudentMatchStatus(s).type !== 'new' &&
+                  showMatchTooltip(s, $event)
+                "
+                @mousemove="
+                  getStudentMatchStatus(s).type !== 'new' &&
+                  moveMatchTooltip($event)
+                "
+                @mouseleave="hideMatchTooltip"
+              >
+                <i
+                  class="fas"
+                  :class="getStudentMatchStatus(s).icon"
+                  aria-hidden="true"
+                ></i>
+
+                {{getStudentMatchStatus(s).label}}
+              </span>
+            </td>
+
+            <td
+              class="mobile-student-actions px-3 sm:px-4 py-2 text-center whitespace-nowrap"
+            >
+              <button
+                v-if="isSettingsClassMatchable"
+                type="button"
+                @click="openEditStudentMatchModal(s)"
+                class="text-gray-400 hover:text-purple-500 mr-2"
+                title="修改匹配"
+                aria-label="修改匹配"
+              >
+                <i class="fas fa-link" aria-hidden="true"></i>
+              </button>
+
+              <button
+                type="button"
+                @click="openModal('editStudent', {
+                  id: s.id,
+                  studentNumber: s.studentNumber,
+                  studentName: s.studentName,
+                  yearId: settingsCurrentYearId,
+                  classId: settingsCurrentClassId
+                })"
+                class="text-gray-400 hover:text-blue-500 mr-2"
+                title="編輯學生"
+                aria-label="編輯學生"
+              >
+                <i class="fas fa-edit" aria-hidden="true"></i>
+              </button>
+
+              <button
+                type="button"
+                @click="openModal('deleteConfirm', {
+                  target: 'student',
+                  id: s.id,
+                  yearId: settingsCurrentYearId,
+                  classId: settingsCurrentClassId,
+                  message: '確定要刪除學生「' + s.studentName + '」嗎？'
+                })"
+                class="text-gray-400 hover:text-red-500"
+                title="刪除學生"
+                aria-label="刪除學生"
+              >
+                <i class="fas fa-trash" aria-hidden="true"></i>
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="settingsSortedStudents.length===0" class="text-center text-gray-400 py-8">尚無學生，請新增或批量匯入</div>
+
+      <div
+        v-if="settingsSortedStudents.length === 0"
+        class="text-center text-gray-400 py-8"
+      >
+        尚無學生，請新增或批量匯入
+      </div>
     </div>
   </div>
 
@@ -3674,9 +4408,6 @@
 </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/profile-module.js"></script>
@@ -3687,6 +4418,7 @@
 <script src="js/analysis-module.js"></script>
 <script src="js/export-module.js"></script>
 <script src="js/settings-module.js"></script>
+<script src="js/mobile-ui.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

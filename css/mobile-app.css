@@ -1,0 +1,1049 @@
+/* ================================================================
+   Mobile App Layout
+   ================================================================ */
+
+@media (max-width: 1023px) {
+
+  :root {
+    --mobile-vh: 100vh;
+    --mobile-vv-top: 0px;
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    --mobile-bg: #f3f5f9;
+    --mobile-surface: #ffffff;
+    --mobile-text: #172033;
+    --mobile-muted: #748094;
+    --mobile-border: #e5eaf1;
+    --mobile-shadow: 0 5px 20px rgba(23, 32, 51, 0.055);
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --mobile-vh: 100dvh;
+    }
+  }
+
+  :root.app-dark {
+    --mobile-bg: #10171d;
+    --mobile-surface: #18222a;
+    --mobile-text: #f0ece1;
+    --mobile-muted: #9aa7b2;
+    --mobile-border: rgba(255, 255, 255, 0.09);
+    --mobile-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  html,
+  body,
+  #app {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ---------- App 外殼 ---------- */
+
+  .app-shell {
+    position: fixed;
+    top: var(--mobile-vv-top);
+    left: 0;
+    right: 0;
+
+    height: var(--mobile-vh) !important;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--mobile-bg);
+  }
+
+  .app-workspace {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell .app-main {
+    min-width: 0;
+    min-height: 0;
+    background: var(--mobile-bg) !important;
+
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .view-grades .app-main,
+  .view-scoring .app-main,
+  .view-analysis .app-main {
+    overflow: hidden;
+  }
+
+  .view-scoring .app-main > div > .h-full {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* ---------- 頂部標題列 ---------- */
+
+  .app-shell .app-header {
+    order: 1;
+    position: relative;
+    z-index: 30;
+    flex: 0 0 auto;
+
+    min-height: 64px;
+    gap: 8px;
+
+    padding:
+      calc(8px + env(safe-area-inset-top, 0px))
+      max(12px, env(safe-area-inset-right, 0px))
+      8px
+      max(12px, env(safe-area-inset-left, 0px));
+
+    color: var(--mobile-text) !important;
+    background: var(--mobile-surface) !important;
+    border-bottom: 1px solid var(--mobile-border);
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .app-header-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .app-header-heading h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 750;
+    line-height: 1.3;
+    letter-spacing: 0;
+  }
+
+  .app-header-subtitle {
+    margin-top: 3px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--mobile-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .app-header-desktop-context {
+    display: none !important;
+  }
+
+  .app-header > button {
+    display: grid;
+    place-items: center;
+
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+
+    border-radius: 12px;
+    color: var(--mobile-muted);
+    background: var(--mobile-bg);
+  }
+
+  .app-header > button:first-child {
+    color: var(--theme-primary);
+    background: rgba(var(--theme-primary-rgb), 0.10);
+  }
+
+  .app-header > .relative > button {
+    min-height: 42px;
+  }
+
+  .app-header .absolute.top-full {
+    width: min(300px, calc(100vw - 24px));
+    border: 1px solid var(--mobile-border);
+    border-radius: 18px;
+  }
+
+  .app-header .absolute.top-full button {
+    min-height: 46px;
+  }
+
+  /* ---------- 底部分頁導覽 ---------- */
+
+  .app-shell .app-nav {
+    order: 3;
+    position: relative;
+    z-index: 30;
+    flex: 0 0 auto;
+
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: center;
+
+    width: 100%;
+    overflow: visible;
+
+    padding:
+      6px
+      max(6px, env(safe-area-inset-right, 0px))
+      calc(5px + var(--mobile-safe-bottom))
+      max(6px, env(safe-area-inset-left, 0px));
+
+    background: var(--mobile-surface) !important;
+    border-top: 1px solid var(--mobile-border);
+    border-bottom: 0;
+    box-shadow: 0 -5px 20px rgba(15, 23, 42, 0.035);
+  }
+
+  .app-nav .app-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+
+    min-width: 0;
+    min-height: 48px;
+    padding: 2px 1px;
+
+    color: var(--mobile-muted) !important;
+    background: transparent !important;
+    background-image: none !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 52px;
+    height: 27px;
+    border-radius: 14px;
+
+    transition: background .16s ease, color .16s ease;
+  }
+
+  .app-nav .app-tab-icon i {
+    font-size: 19px;
+  }
+
+  .app-tab-label {
+    overflow: hidden;
+    max-width: 100%;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .app-nav .app-tab.is-active {
+    color: var(--theme-text) !important;
+  }
+
+  .app-tab.is-active .app-tab-icon {
+    background: rgba(var(--theme-primary-rgb), 0.13);
+  }
+
+  .app-dark .app-nav .app-tab.is-active {
+    color: #f0ece1 !important;
+  }
+
+  .app-nav .app-tab:active {
+    transform: scale(.95);
+  }
+
+  .app-nav .app-tab:focus-visible {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: -2px;
+  }
+
+  /* 輸入時讓出更多空間。 */
+
+  .app-shell.is-keyboard-open > .app-nav {
+    display: none;
+  }
+
+  .is-keyboard-open .app-header-subtitle,
+  .is-keyboard-open .grades-toolbar-actions,
+  .is-keyboard-open .grades-statusbar {
+    display: none !important;
+  }
+
+  .is-keyboard-open .app-header {
+    min-height: 48px;
+    padding-top: calc(4px + env(safe-area-inset-top, 0px));
+    padding-bottom: 4px;
+  }
+
+  /* ---------- 共用卡片與表單 ---------- */
+
+  .view-home .app-main > div,
+  .view-settings .app-main > div {
+    padding: 14px;
+  }
+
+  .app-shell .app-main .bg-white.rounded-xl {
+    background: var(--mobile-surface) !important;
+    border: 1px solid var(--mobile-border);
+    border-radius: 18px;
+    box-shadow: var(--mobile-shadow) !important;
+  }
+
+  .app-main .glass-card,
+  .app-main .calendar-glass {
+    border-radius: 20px;
+    box-shadow: var(--mobile-shadow) !important;
+  }
+
+  .app-shell .app-main button:not(.seg-option):not(.cal-add-btn),
+  .app-modal button,
+  .cal-popover button,
+  .detail-panel button {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .app-main .group .opacity-0 {
+    opacity: 1 !important;
+  }
+
+  .app-main input:not([type="checkbox"]):not([type="radio"]):not(.grades-inline-input),
+  .app-main select,
+  .app-main textarea,
+  .app-modal input:not([type="checkbox"]):not([type="radio"]),
+  .app-modal select,
+  .app-modal textarea,
+  .detail-panel input {
+    min-width: 0;
+    min-height: 44px;
+    max-width: 100%;
+    border-radius: 11px;
+    font-size: 16px;
+  }
+
+  .app-main input[type="checkbox"],
+  .app-main input[type="radio"],
+  .app-modal input[type="checkbox"],
+  .app-modal input[type="radio"] {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--theme-primary);
+  }
+
+  .app-main .seg-track {
+    height: 42px !important;
+  }
+
+  .app-main .seg-option {
+    min-height: 0 !important;
+    height: 100%;
+    font-size: 12px;
+  }
+
+  .settings-back-btn {
+    min-height: 40px;
+    border-radius: 12px;
+  }
+
+  .year-tab-btn {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  /* ---------- 首頁 ---------- */
+
+  .view-home .app-main > div > div:first-child {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .view-home .app-main > div > div:first-child h2 {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+
+  .home-quicknav-card {
+    min-height: 110px;
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .home-quicknav-card > i {
+    margin-bottom: 10px;
+    font-size: 24px;
+  }
+
+  .home-quicknav-card > .font-semibold {
+    font-size: 14px;
+  }
+
+  /* ---------- 月曆 ---------- */
+
+  .calendar-glass {
+    padding: 12px !important;
+  }
+
+  .calendar-glass .cal-day {
+    min-width: 0;
+    min-height: 96px;
+    padding: 4px !important;
+  }
+
+  .cal-day .cal-add-btn {
+    display: none;
+  }
+
+  .cal-event-month {
+    gap: 3px;
+    margin-bottom: 3px;
+    padding: 3px 4px;
+    border-radius: 5px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .cal-more-link {
+    font-size: 10px;
+  }
+
+  .app-calendar-week-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .app-calendar-week-grid {
+    grid-template-columns: repeat(7, minmax(145px, 1fr)) !important;
+    width: max-content;
+    min-width: 100%;
+    gap: 8px !important;
+  }
+
+  .app-calendar-week-grid .cal-week-day {
+    min-height: 250px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  /* ---------- 成績輸入 ---------- */
+
+  .grades-toolbar {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid var(--mobile-border);
+  }
+
+  .grades-toolbar-top {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    margin-bottom: 8px;
+  }
+
+  .grades-toolbar-top > .flex-1 {
+    display: none;
+  }
+
+  .grades-toolbar-top > button {
+    flex-shrink: 0;
+    min-height: 36px !important;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 11px;
+  }
+
+  .grades-toolbar-top > div:last-child {
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  .grades-toolbar-top > div:last-child > span {
+    display: none !important;
+  }
+
+  .grades-toolbar-top .seg-track {
+    width: 144px;
+    min-width: 138px !important;
+    height: 36px !important;
+  }
+
+  .grades-toolbar-top .seg-option {
+    font-size: 11px;
+  }
+
+  .grades-toolbar-actions {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 3px;
+
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .grades-toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .grades-toolbar-actions > *,
+  .grades-toolbar-actions > .relative {
+    flex-shrink: 0;
+  }
+
+  .grades-toolbar-actions > .flex-1 {
+    display: none;
+  }
+
+  .grades-toolbar-actions > button,
+  .grades-toolbar-actions > .relative > button {
+    min-height: 36px !important;
+    padding: 6px 10px;
+    white-space: nowrap;
+    border-radius: 10px;
+  }
+
+  .grades-toolbar-actions > label {
+    white-space: nowrap;
+  }
+
+  .grades-toolbar-actions input[type="number"] {
+    width: 52px;
+    min-height: 34px !important;
+  }
+
+  .grades-scroll-container {
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .grades-table .grades-cell {
+    height: 40px;
+  }
+
+  .grades-table .grades-inline-input {
+    font-size: 16px !important;
+  }
+
+  .grades-statusbar {
+    min-height: 30px;
+    gap: 8px;
+    padding: 6px 10px !important;
+    font-size: 10px;
+  }
+
+  /* ---------- 班別選擇抽屜 ---------- */
+
+  .app-shell .mobile-overlay {
+    position: fixed;
+    top: var(--mobile-vv-top);
+    left: 0;
+    right: 0;
+    bottom: auto;
+
+    height: var(--mobile-vh);
+    z-index: 60 !important;
+
+    background: rgba(10, 17, 29, .45);
+    backdrop-filter: blur(3px);
+  }
+
+  .app-shell .mobile-sidebar {
+    position: fixed;
+    top: var(--mobile-vv-top);
+    left: 0;
+    bottom: auto;
+
+    width: min(86vw, 340px);
+    height: var(--mobile-vh);
+    z-index: 65 !important;
+
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: var(--mobile-safe-bottom);
+
+    border-radius: 0 24px 24px 0;
+    background: var(--mobile-surface) !important;
+    box-shadow: 15px 0 50px rgba(0, 0, 0, .16);
+  }
+
+  .mobile-sidebar .cursor-pointer {
+    min-height: 44px;
+  }
+
+  /* ---------- 原有下拉選單 → 底部操作面板 ---------- */
+
+  .mobile-menu-backdrop,
+  .mobile-detail-backdrop {
+    position: fixed;
+    top: var(--mobile-vv-top);
+    left: 0;
+    right: 0;
+
+    height: var(--mobile-vh);
+    background: rgba(10, 17, 29, .42);
+    backdrop-filter: blur(3px);
+  }
+
+  .mobile-menu-backdrop {
+    z-index: 70;
+  }
+
+  .mobile-detail-backdrop {
+    z-index: 85;
+  }
+
+  .app-shell .app-main .absolute.top-full {
+    position: fixed !important;
+
+    top: calc(var(--mobile-vv-top) + var(--mobile-vh)) !important;
+    bottom: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+
+    width: 100% !important;
+    max-width: 640px !important;
+    max-height: calc(var(--mobile-vh) - 80px) !important;
+    margin: 0 auto !important;
+
+    transform: translateY(-100%) !important;
+    z-index: 80 !important;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    padding:
+      22px
+      16px
+      calc(16px + var(--mobile-safe-bottom)) !important;
+
+    color: var(--mobile-text);
+    background: var(--mobile-surface) !important;
+    border: 1px solid var(--mobile-border);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -15px 55px rgba(0, 0, 0, .16);
+  }
+
+  .app-main .absolute.top-full::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: calc(50% - 18px);
+
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--mobile-muted);
+    opacity: .35;
+  }
+
+  .app-shell .app-main .absolute.top-full > button {
+    min-height: 48px;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .app-main .absolute.top-full > label {
+    min-height: 42px;
+  }
+
+  .app-main .custom-cat-select-btn,
+  .app-main .custom-cat-delete-btn {
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  /* ---------- 新增 / 編輯 / 確認彈窗 ---------- */
+
+  .app-modal {
+    top: var(--mobile-vv-top) !important;
+    bottom: auto !important;
+    height: var(--mobile-vh);
+
+    align-items: flex-end !important;
+    padding: 0 !important;
+    z-index: 100 !important;
+
+    background: rgba(10, 17, 29, .48);
+    backdrop-filter: blur(4px);
+  }
+
+  .app-modal-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+
+    width: 100%;
+    max-width: 640px !important;
+    max-height:
+      calc(
+        var(--mobile-vh) -
+        max(12px, env(safe-area-inset-top, 0px))
+      ) !important;
+
+    min-height: 0;
+    margin: 0;
+    padding-top: 12px;
+
+    overflow: hidden !important;
+
+    color: var(--mobile-text);
+    background: var(--mobile-surface) !important;
+    border: 1px solid var(--mobile-border);
+    border-radius: 26px 26px 0 0 !important;
+    box-shadow: 0 -20px 60px rgba(0, 0, 0, .18);
+  }
+
+  .app-modal-panel::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: calc(50% - 18px);
+
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--mobile-muted);
+    opacity: .35;
+  }
+
+  .app-modal-head,
+  .app-modal-foot {
+    flex: 0 0 auto;
+  }
+
+  .app-modal-head {
+    padding: 10px 18px;
+  }
+
+  .app-modal-head > button {
+    min-width: 40px;
+  }
+
+  .app-modal-body,
+  .app-modal-panel > .flex-1 {
+    min-height: 0;
+  }
+
+  .app-modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 18px;
+    scroll-padding-block: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-modal-foot {
+    gap: 10px;
+    padding: 12px 18px calc(14px + var(--mobile-safe-bottom));
+    background: var(--mobile-surface) !important;
+  }
+
+  .app-modal-foot > button {
+    flex: 1;
+    min-height: 48px;
+    border-radius: 13px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* ---------- 成績詳情 / 月曆詳情 ---------- */
+
+  .app-shell .detail-panel,
+  .app-event-sheet {
+    position: fixed !important;
+
+    top: calc(var(--mobile-vv-top) + var(--mobile-vh)) !important;
+    bottom: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+
+    width: 100% !important;
+    max-width: 640px !important;
+    max-height: calc(var(--mobile-vh) - 20px);
+
+    margin: 0 auto;
+    transform: translateY(-100%) !important;
+  }
+
+  .app-shell .detail-panel {
+    z-index: 90 !important;
+    overflow-y: auto !important;
+    padding-bottom: var(--mobile-safe-bottom);
+    border-radius: 24px 24px 0 0;
+  }
+
+  .app-event-sheet {
+    z-index: 95 !important;
+  }
+
+  .app-event-sheet .cal-popover {
+    width: 100% !important;
+    max-width: none;
+    max-height: calc(var(--mobile-vh) - 20px);
+
+    overflow-y: auto;
+    padding-bottom: var(--mobile-safe-bottom);
+    border-radius: 24px 24px 0 0;
+  }
+
+  .app-event-backdrop {
+    top: var(--mobile-vv-top) !important;
+    bottom: auto !important;
+    height: var(--mobile-vh);
+    z-index: 90 !important;
+    backdrop-filter: blur(3px);
+  }
+
+  /* ---------- 登入介面 ---------- */
+
+  .profile-gate {
+    top: var(--mobile-vv-top);
+    bottom: auto;
+    height: var(--mobile-vh);
+
+    padding:
+      max(20px, env(safe-area-inset-top, 0px))
+      18px
+      max(20px, var(--mobile-safe-bottom));
+
+    align-items: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .profile-gate-inner {
+    flex-shrink: 0;
+    margin-block: auto;
+  }
+
+  .profile-gate-title {
+    font-size: 26px;
+    letter-spacing: .08em;
+  }
+
+  .profile-gate-logo,
+  .profile-gate-crown {
+    width: 62px;
+    height: 62px;
+    font-size: 27px;
+  }
+
+  .profile-glass-card {
+    padding: 22px;
+    border-radius: 22px;
+  }
+
+  .profile-input {
+    min-height: 50px;
+    font-size: 16px;
+  }
+
+  .profile-btn-primary {
+    min-height: 50px;
+  }
+
+  .profile-pick {
+    min-height: 140px;
+  }
+
+  /* ---------- 通知 ---------- */
+
+  .app-toasts {
+    top: calc(var(--mobile-vv-top) + env(safe-area-inset-top, 0px) + 10px) !important;
+    left: 12px !important;
+    right: 12px !important;
+
+    min-width: 0 !important;
+    z-index: 200 !important;
+    pointer-events: none;
+  }
+
+  .app-toasts > div {
+    pointer-events: auto;
+    border-radius: 14px;
+  }
+
+  .year-loading-overlay {
+    top: var(--mobile-vv-top) !important;
+    bottom: auto !important;
+    height: var(--mobile-vh);
+  }
+}
+
+/* ================================================================
+   窄螢幕：學生管理表格改為卡片
+   ================================================================ */
+
+@media (max-width: 639px) {
+
+  .cal-event-month .cal-event-dot {
+    display: none;
+  }
+
+  .mobile-student-container {
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-student-list {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .mobile-student-list thead {
+    display: none;
+  }
+
+  .mobile-student-list tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-student-list tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 8px;
+
+    padding: 14px;
+
+    background: var(--mobile-surface);
+    border: 1px solid var(--mobile-border);
+    border-radius: 17px;
+    box-shadow: var(--mobile-shadow);
+  }
+
+  .mobile-student-list td {
+    display: block;
+    min-width: 0;
+    padding: 0 !important;
+    border: 0;
+    text-align: left;
+  }
+
+  .mobile-student-name {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 16px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-student-number {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 12px;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-student-number::before {
+    content: "學號 ";
+  }
+
+  .mobile-student-class {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 12px;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-student-class::before {
+    content: "班別 ";
+  }
+
+  .mobile-student-match {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    padding-top: 5px !important;
+  }
+
+  .mobile-student-actions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+
+    display: flex !important;
+    align-items: center;
+    align-self: center;
+    gap: 4px;
+  }
+
+  .mobile-student-actions button {
+    display: grid;
+    place-items: center;
+
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    margin: 0 !important;
+
+    border-radius: 12px;
+    background: var(--mobile-bg);
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-modal * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ================================================================
+   Mobile integration fixes
+   放在 mobile-app.css 最底部
+   ================================================================ */
+
+@media (max-width: 1023px) {
+
+  /* 手機已有可伸展的標題區，不再保留桌面空白佔位。 */
+  .app-shell .app-header > .flex-1 {
+    display: none;
+  }
+
+  /* 月曆事件詳情遮罩。 */
+  .app-event-backdrop {
+    background: rgba(10, 17, 29, 0.42);
+  }
+
+  /*
+   * 工具列本身含有「不合格線」輸入框。
+   * 鍵盤打開時保留工具列，避免正在編輯的輸入框被隱藏。
+   */
+  .app-shell.is-keyboard-open .grades-toolbar-actions {
+    display: flex !important;
+  }
+
+  /* 窄螢幕下避免狀態列文字互相擠壓。 */
+  .app-shell .grades-statusbar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 639px) {
+
+  /*
+   * 必須比共用的 .bg-white.rounded-xl 卡片規則更具體，
+   * 才能移除學生卡片列表外圍多餘的背景、邊框及陰影。
+   */
+  .app-shell .app-main .mobile-student-container.bg-white.rounded-xl {
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+}

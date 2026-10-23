@@ -435,10 +435,9 @@ createApp({
   methods: {
     ...GradesMethods, ...ScoringMethods, ...CalendarMethods, ...CrudMethods, ...AnalysisMethods, ...ExportMethods, ...SettingsMethods, ...ProfileMethods,
 
-    switchToTab(key) {
-      if (key === 'settings') this.settingsNav = [];
-      this.currentView = key;
-    },
+switchToTab(key) {
+  this.mobileNavigate(key);
+},
 
     getClassObj(yearId, classId) { const y=this.academicYears.find(y=>y.id===yearId); if(!y)return null; return y.classes.find(c=>c.id===classId)||null; },
     getTabDef(key) { return this.allTabs.find(t => t.key === key) || { label:key, icon:'' }; },
@@ -1247,4 +1246,4 @@ createApp({
       }
     });
   }
-}).mount('#app');
+}).mixin(MobileUiMixin).mount('#app');
