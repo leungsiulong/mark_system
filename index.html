@@ -2124,7 +2124,7 @@
     v-for="tab in orderedTabs"
     :key="tab.key"
     type="button"
-    @click="switchToTab(tab.key)"
+    @click="mobileTabClick(tab.key)"
     class="app-tab flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition"
     :class="
       currentView === tab.key
@@ -2154,9 +2154,109 @@
   @click.stop="mobileCloseMenus()"
 ></div>
 
+<!-- ★ v2: 手機版成績輸入工具列選單（放在捲動容器外，避免被裁切而無法彈出） -->
+<template v-if="mobileCompact && currentView === 'grades' && currentClass">
+  <transition name="mobile-sheet">
+    <div
+      v-if="gradesCPMenuOpen"
+      class="mobile-action-sheet"
+      role="dialog"
+      aria-label="新增課堂表現"
+      @click.stop
+    >
+      <div class="mobile-action-sheet-title">新增課堂表現</div>
+      <button type="button" class="mobile-action-sheet-item"
+        @click="gradesCPMenuOpen = false; openAddAssessmentModal('class_performance', 'ut')">
+        <i class="fas fa-balance-scale text-purple-500" aria-hidden="true"></i>
+        <span>統測期課堂表現</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item"
+        @click="gradesCPMenuOpen = false; openAddAssessmentModal('class_performance', 'exam')">
+        <i class="fas fa-file-alt text-purple-500" aria-hidden="true"></i>
+        <span>考試期課堂表現</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item is-cancel" @click="gradesCPMenuOpen = false">取消</button>
+    </div>
+  </transition>
+
+  <transition name="mobile-sheet">
+    <div
+      v-if="gradesCustomMenuOpen"
+      class="mobile-action-sheet"
+      role="dialog"
+      aria-label="自訂類別"
+      @click.stop
+    >
+      <div class="mobile-action-sheet-title">自訂類別</div>
+
+      <div
+        v-if="!currentClass.customCategories || currentClass.customCategories.length === 0"
+        class="mobile-action-sheet-empty"
+      >
+        尚無自訂類別，請先新增類別
+      </div>
+
+      <div
+        v-for="cat in (currentClass.customCategories || [])"
+        :key="'m-' + cat.id"
+        class="mobile-action-sheet-row"
+      >
+        <button type="button" class="mobile-action-sheet-item"
+          @click="gradesCustomMenuOpen = false; openAddAssessmentModal('custom', null, cat.id)">
+          <span class="mobile-action-sheet-swatch"
+            :style="{ backgroundColor: getCustomCategoryColor(cat.colorKey).tagBg }"></span>
+          <span>新增「{{cat.name}}」項目</span>
+        </button>
+        <button type="button" class="mobile-action-sheet-icon"
+          @click="gradesCustomMenuOpen = false; confirmDeleteCustomCategory(cat)"
+          :aria-label="'刪除類別「' + cat.name + '」'">
+          <i class="fas fa-trash" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div class="mobile-action-sheet-divider"></div>
+
+      <button type="button" class="mobile-action-sheet-item is-accent"
+        @click="gradesCustomMenuOpen = false; openAddCustomCategoryModal()">
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        <span>新增類別...</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item is-cancel" @click="gradesCustomMenuOpen = false">取消</button>
+    </div>
+  </transition>
+
+  <transition name="mobile-sheet">
+    <div
+      v-if="gradesExportMenuOpen"
+      class="mobile-action-sheet"
+      role="dialog"
+      aria-label="匯出成績"
+      @click.stop
+    >
+      <div class="mobile-action-sheet-title">選擇匯出格式</div>
+      <button type="button" class="mobile-action-sheet-item"
+        @click="gradesExportMenuOpen = false; exportGradesExcel()">
+        <i class="fas fa-file-excel text-emerald-600" aria-hidden="true"></i>
+        <span>Excel（含格式）</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item"
+        @click="gradesExportMenuOpen = false; exportGradesPDF()">
+        <i class="fas fa-file-pdf text-red-600" aria-hidden="true"></i>
+        <span>PDF（含格式）</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item"
+        @click="gradesExportMenuOpen = false; exportCSV()">
+        <i class="fas fa-file-csv text-blue-600" aria-hidden="true"></i>
+        <span>CSV（純文字）</span>
+      </button>
+      <button type="button" class="mobile-action-sheet-item is-cancel" @click="gradesExportMenuOpen = false">取消</button>
+    </div>
+  </transition>
+</template>
+
 <div class="app-workspace flex flex-1 min-h-0 relative">
         <transition name="overlay-fade">
-        <div v-if="leftPanelOpen && currentView !== 'home' && currentView !== 'settings'" @click="leftPanelOpen=false" @touchmove.prevent class="absolute inset-0 bg-black/30 z-10 lg:hidden mobile-overlay"></div>
+        <div v-if="leftPanelOpen && currentView !== 'home' && currentView !== 'settings'" @click="mobileCompact ? mobileOverlayClose() : (leftPanelOpen = false)" @touchmove.prevent class="absolute inset-0 bg-black/30 z-10 lg:hidden mobile-overlay"></div>
       </transition>
       <transition name="sidebar-slide">
         <aside v-if="isLeftPanelVisible" class="w-56 bg-white border-r flex flex-col shrink-0 overflow-y-auto absolute inset-y-0 left-0 z-20 shadow-xl lg:static lg:shadow-none lg:z-10 mobile-sidebar">
@@ -2530,7 +2630,7 @@
                   </button>
 
                   <div
-                    v-if="gradesCPMenuOpen"
+                    v-if="gradesCPMenuOpen && !mobileCompact"
                     class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-40"
                     @click.stop
                   >
@@ -2582,7 +2682,7 @@
                   </button>
 
                   <div
-                    v-if="gradesCustomMenuOpen"
+                    v-if="gradesCustomMenuOpen && !mobileCompact"
                     class="absolute top-full mt-1 left-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-64"
                     @click.stop
                   >
@@ -2661,7 +2761,7 @@
                   </button>
 
                   <div
-                    v-if="gradesExportMenuOpen"
+                    v-if="gradesExportMenuOpen && !mobileCompact"
                     class="absolute top-full mt-1 right-0 bg-white border rounded-lg shadow-lg z-30 py-1 w-44"
                     @click.stop
                   >
@@ -2760,8 +2860,24 @@
 
             <div v-if="gradesOrderedAssessments.length===0" class="flex-1 flex items-center justify-center text-gray-400"><div class="text-center"><i class="fas fa-clipboard-list text-4xl mb-3"></i><p class="font-medium">尚未新增評估項目</p><p class="text-sm mt-1">請使用上方按鈕新增課業、小測或考試</p></div></div>
 
-            <div v-else class="flex-1 min-h-0 grades-scroll-container" :class="{'is-dragging': gradesIsDragging}" ref="gradesWrapper" tabindex="-1" @keydown="gradesHandleKeydown" @copy="gradesHandleCopy" @paste="gradesHandlePaste" @click.self="gradesDeselect">
-              <table class="grades-table" :class="{'has-class-col': isCurrentClassElective}">
+            <div v-else
+              class="flex-1 min-h-0 grades-scroll-container"
+              :class="{'is-dragging': gradesIsDragging}"
+              ref="gradesWrapper"
+              tabindex="-1"
+              @keydown="gradesHandleKeydown"
+              @copy="gradesHandleCopy"
+              @paste="gradesHandlePaste"
+              @click.self="gradesDeselect"
+              @touchstart.passive="gradesOnTableTouchStart"
+              @touchmove="gradesOnTableTouchMove"
+              @touchend.passive="gradesOnTableTouchEnd"
+              @touchcancel.passive="gradesOnTableTouchEnd"
+              @wheel="gradesOnTableWheel"
+              @gesturestart.prevent
+              @gesturechange.prevent
+              @gestureend.prevent>
+              <table class="grades-table" :class="{'has-class-col': isCurrentClassElective}" :style="gradesTableZoomStyle">
                 <thead>
                   <!-- Row 1: frozen + group headers -->
                   <tr>
@@ -2925,22 +3041,36 @@
                 <button @click="gradesDeleteAssessmentFromDetail" class="flex-1 px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"><i class="fas fa-trash mr-1"></i>刪除</button>
               </div>
             </div>
-            <div
-              class="grades-statusbar shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between text-xs text-gray-400"
+<div
+              class="grades-statusbar shrink-0 bg-white border-t px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2 text-xs text-gray-400"
             >
-              <span>
+              <span class="shrink-0">
                 共 {{gradesSortedStudents.length}} 位學生
                 · {{gradesOrderedAssessments.length}} 個項目
               </span>
 
-              <span v-if="gradesIsTouchDevice" class="sm:inline">
-                輕觸預覽，再次輕觸進入編輯
-              </span>
+              <div class="flex items-center gap-2 min-w-0">
+                <span v-if="gradesIsTouchDevice" class="truncate">
+                  輕觸預覽，再次輕觸編輯 · 雙指縮放
+                </span>
 
-              <span v-else class="hidden sm:inline">
-                小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼
-                · 方向鍵移動 · F2 微調 · Ctrl+Z 復原
-              </span>
+                <span v-else class="hidden md:inline truncate">
+                  小測「10+2」加分 · 拖曳多選 · Ctrl+C/V 智能複貼
+                  · 方向鍵移動 · F2 微調 · Ctrl+Z 復原 · Ctrl+滾輪縮放
+                </span>
+
+                <div class="grades-zoom-ctrl shrink-0" role="group" aria-label="成績表顯示比例">
+                  <button type="button" @click="gradesZoomOut" :disabled="gradesZoom <= 0.5" title="縮小" aria-label="縮小">
+                    <i class="fas fa-search-minus text-xs" aria-hidden="true"></i>
+                  </button>
+                  <button type="button" class="grades-zoom-value" @click="gradesZoomReset" title="重設為 100%">
+                    {{gradesZoomPercent}}%
+                  </button>
+                  <button type="button" @click="gradesZoomIn" :disabled="gradesZoom >= 2" title="放大" aria-label="放大">
+                    <i class="fas fa-search-plus text-xs" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
         </div>
@@ -3013,6 +3143,86 @@
             <i class="fas fa-chevron-down text-gray-400 transition-transform text-sm" :class="{'rotate-180':scoringAccordion.attribution}"></i>
           </button>
           <div v-if="scoringAccordion.attribution" class="px-3 sm:px-5 pb-4 sm:pb-5 border-t">
+            <!-- ★ v9: 按日期自動歸類 -->
+            <div v-if="gradesTerm" class="attr-date-panel mt-3 rounded-lg border bg-indigo-50 p-3">
+              <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <div class="text-sm font-semibold text-gray-700">
+                  <i class="fas fa-calendar-check text-indigo-500 mr-1"></i>按日期自動歸類
+                  <span class="text-xs font-normal text-gray-500">（{{gradesTerm.name}}）</span>
+                </div>
+                <button type="button" @click="scoringAttrFillFromAssessments"
+                  class="px-2.5 py-1 text-xs bg-white border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition">
+                  <i class="fas fa-magic mr-1"></i>以統測／考試日期填入
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div class="text-xs font-semibold text-indigo-700 mb-1"><i class="fas fa-balance-scale mr-1"></i>統測計算期</div>
+                  <div class="flex items-center gap-1.5">
+                    <input type="date" :value="scoringAttrConfig.utStart || ''"
+                      @change="scoringAttrSet('utStart', $event.target.value)"
+                      class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none bg-white" aria-label="統測計算期開始">
+                    <span class="text-xs text-gray-400 shrink-0">至</span>
+                    <input type="date" :value="scoringAttrConfig.utEnd || ''"
+                      @change="scoringAttrSet('utEnd', $event.target.value)"
+                      class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none bg-white" aria-label="統測計算期截止">
+                  </div>
+                </div>
+                <div>
+                  <div class="text-xs font-semibold text-amber-700 mb-1"><i class="fas fa-file-alt mr-1"></i>考試計算期</div>
+                  <div class="flex items-center gap-1.5">
+                    <input type="date" :value="scoringAttrConfig.examStart || ''"
+                      @change="scoringAttrSet('examStart', $event.target.value)"
+                      class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none bg-white" aria-label="考試計算期開始">
+                    <span class="text-xs text-gray-400 shrink-0">至</span>
+                    <input type="date" :value="scoringAttrConfig.examEnd || ''"
+                      @change="scoringAttrSet('examEnd', $event.target.value)"
+                      class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none bg-white" aria-label="考試計算期截止">
+                  </div>
+                </div>
+              </div>
+
+              <label class="flex items-center gap-2 mt-3 text-xs text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" :checked="scoringAttrConfig.autoApply !== false"
+                  @change="scoringAttrSet('autoApply', $event.target.checked)" class="rounded border-gray-300">
+                <span>自動歸類（更改計算日期、新增項目或修改項目日期時自動套用）</span>
+              </label>
+
+              <div v-if="scoringAttrPreview.error" class="mt-2 text-xs text-red-500">
+                <i class="fas fa-exclamation-circle mr-1"></i>{{scoringAttrPreview.error}}
+              </div>
+
+              <div v-else-if="scoringAttrPreview.configured" class="mt-2 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                <span><span class="font-semibold text-indigo-600">統測</span> {{scoringAttrPreview.ut}} 項</span>
+                <span><span class="font-semibold text-amber-600">考試</span> {{scoringAttrPreview.exam}} 項</span>
+                <span>不計入 {{scoringAttrPreview.none}} 項</span>
+                <span v-if="scoringAttrPreview.undated > 0" class="text-gray-400">{{scoringAttrPreview.undated}} 項未設日期（維持不變）</span>
+                <span v-if="scoringAttrPreview.changed > 0" class="text-indigo-600 font-medium">與目前設定不同：{{scoringAttrPreview.changed}} 項</span>
+              </div>
+
+              <div v-if="!scoringAttrPreview.error && scoringAttrPreview.overlap" class="mt-1 text-xs text-amber-600">
+                <i class="fas fa-info-circle mr-1"></i>兩段計算期有重疊，重疊日期的項目會優先計入統測。
+              </div>
+
+              <div class="flex flex-wrap gap-2 mt-3">
+                <button type="button" @click="scoringApplyAttributionByDate()"
+                  :disabled="!scoringAttrPreview.configured || !!scoringAttrPreview.error"
+                  class="px-3 py-1.5 text-xs bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                  <i class="fas fa-sync-alt mr-1"></i>按日期重新歸類
+                </button>
+                <button type="button" @click="scoringAttrClear" v-if="scoringAttrPreview.configured"
+                  class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition">
+                  <i class="fas fa-eraser mr-1"></i>清除日期
+                </button>
+              </div>
+
+              <p class="text-xs text-gray-400 mt-2 leading-relaxed">
+                <i class="fas fa-info-circle mr-1"></i>
+                項目日期落在統測計算期 → 計入統測；落在考試計算期 → 計入考試；兩者皆否 → 不計入。開始日期留空表示不設下限，截止日期留空表示不設上限。歸類後仍可在下方逐項手動調整。
+              </p>
+            </div>
+
             <div class="mt-3 space-y-2">
               <!-- ★ 統測項目用淺靛藍底 + 靛藍外框；考試項目改用淺琥珀底 + 琥珀外框（不再使用紅色） -->
               <div v-for="a in scoringAssignmentsAndQuizzes" :key="'attr-'+a.id" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg transition" :class="(a.scoreCategory||'none')==='exam' ? 'bg-amber-50 ring-1 ring-amber-200' : ((a.scoreCategory||'none')==='ut' ? 'bg-indigo-50 ring-1 ring-indigo-200' : '')">

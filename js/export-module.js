@@ -293,6 +293,7 @@ const ExportMethods = {
         if (inp.parentNode) inp.parentNode.replaceChild(span, inp);
       });
       clone.style.minWidth = '0';
+      clone.style.zoom = '1'; // ★ 忽略畫面縮放比例，PDF 一律以 100% 輸出
       clone.querySelectorAll('.frozen-sn,.frozen-name,.frozen-class,.stats-frozen-sn,.stats-frozen-name,.stats-frozen-class,thead,.sn-col,.name-col').forEach(el => {
         el.style.position = 'static';
         el.style.left = 'auto';

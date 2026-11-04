@@ -1426,7 +1426,12 @@ const CrudMethods = {
       includeInUT: true, includeInExam: true, scores: {}, order,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if (type === 'assignment' || type === 'quiz' || type === 'custom') data.scoreCategory = 'none';
+// ★ v17: 按「項目歸屬」日期設定自動歸類
+    let autoCategory = null;
+    if (type === 'assignment' || type === 'quiz' || type === 'custom') {
+      autoCategory = this._scoringAutoCategoryFor ? this._scoringAutoCategoryFor(cls, termId, date || null) : null;
+      data.scoreCategory = autoCategory || 'none';
+    }
     if (type === 'class_performance') data.period = period;
     if (type === 'custom') data.customCategoryId = customCategoryId;
     if (type === 'assignment' && asgCatId) data.assignmentCategoryId = asgCatId;
@@ -1451,7 +1456,9 @@ const CrudMethods = {
     const dr = await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').add(data);
     if (!term.assessments) term.assessments = [];
     term.assessments.push({ id: dr.id, ...data, createdAt: new Date() });
-    this.closeModal(); this.addToast('已新增「' + aName + '」', 'success');
+    const catHint = autoCategory === 'ut' ? '（已按日期歸入統測）'
+      : autoCategory === 'exam' ? '（已按日期歸入考試）' : '';
+    this.closeModal(); this.addToast('已新增「' + aName + '」' + catHint, 'success');
   },
 
   async updateAssessmentConfirm() {
@@ -1507,10 +1514,22 @@ const CrudMethods = {
     const wasAdjustedPaper = !!a.hasAdjustedPaper;
     const wasMultiplePapers = !!a.hasMultiplePapers;
 
+    const oldDate = a.date || null;
     a.name = name.trim();
     a.fullMark = fm;
     a.date = date || null;
     a.notes = (notes || '').trim();
+
+    // ★ v17: 日期改變時，按「項目歸屬」日期設定自動歸類
+    let autoCategory = null;
+    if ((a.type === 'assignment' || a.type === 'quiz' || a.type === 'custom') &&
+        (date || null) !== oldDate && this._scoringAutoCategoryFor) {
+      const cat = this._scoringAutoCategoryFor(cls, termId, date || null);
+      if (cat && cat !== (a.scoreCategory || 'none')) {
+        a.scoreCategory = cat;
+        autoCategory = cat;
+      }
+    }
 
     if (a.type === 'assignment') {
       let asgCatId = this.modalData.assignmentCategoryId || null;
@@ -1609,6 +1628,7 @@ const CrudMethods = {
       scores: a.scores || {}
     };
 
+    if (autoCategory) updateData.scoreCategory = autoCategory;
     if (a.type === 'assignment') {
       if (a.assignmentCategoryId) updateData.assignmentCategoryId = a.assignmentCategoryId;
       else updateData.assignmentCategoryId = firebase.firestore.FieldValue.delete();
@@ -1655,8 +1675,11 @@ const CrudMethods = {
 
     await db.collection('academicYears').doc(yearId).collection('classes').doc(classId).collection('terms').doc(termId).collection('assessments').doc(assessmentId).update(updateData);
 
+    const catHint = autoCategory === 'ut' ? '（已按日期歸入統測）'
+      : autoCategory === 'exam' ? '（已按日期歸入考試）'
+      : autoCategory === 'none' ? '（按日期設為不計入）' : '';
     this.closeModal();
-    this.addToast('已更新「' + name.trim() + '」', 'success');
+    this.addToast('已更新「' + name.trim() + '」' + catHint, 'success');
   },
 
   async deleteAssessmentDoc(yearId, classId, termId, assessmentId) {

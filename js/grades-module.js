@@ -121,7 +121,8 @@ gradesAutoSelectTerm() {
     const cellRect = cell.getBoundingClientRect();
 
     let frozenLeft = 0;
-    rowEl.querySelectorAll('.frozen-sn, .frozen-name, .frozen-class').forEach(fc => { frozenLeft += fc.offsetWidth; });
+    // ★ v16: 使用實際顯示寬度（成績表縮放後 offsetWidth 不會反映縮放）
+    rowEl.querySelectorAll('.frozen-sn, .frozen-name, .frozen-class').forEach(fc => { frozenLeft += fc.getBoundingClientRect().width; });
 
     const thead = wrapper.querySelector('thead');
     let headerH = 0;
@@ -178,8 +179,11 @@ gradesAutoSelectTerm() {
   },
 
   // ★ v15: 觸控點擊入口
-  gradesOnCellClick(ri, ci, ev) {
+gradesOnCellClick(ri, ci, ev) {
     if (!this.gradesIsTouchDevice) return; // 桌面用 mousedown 即時編輯
+    // ★ v16: 雙指縮放中 / 剛結束時忽略點擊，避免誤選或彈出鍵盤
+    if (this._gradesPinch) return;
+    if (this._gradesPinchEndedAt && Date.now() - this._gradesPinchEndedAt < 400) return;
     this.gradesHandleTouchTap(ri, ci, ev);
   },
 
